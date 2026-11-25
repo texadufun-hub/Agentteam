@@ -202,7 +202,11 @@ class Team:
         if name == "@order":
             src = self.cfg.get("order_from", "Verifier")
             offers = next((r["output"] for r in reversed(results) if r["node"] == src), "")
-            rows = tools.price_order(offers)
+            # Products the store itself lists as not shippable stay out,
+            # even if the Verifier didn't copy that note.
+            blocked = {u.lower() for ls in self._links.values() for label, u in ls
+                       if tools.NO_SHIP.search(label)}
+            rows = tools.price_order(offers, blocked=blocked)
             self._order = [r[2] for r in rows]
             lines = [f"{i}. ${b:.2f} {'confirmed total' if c else 'item price, shipping unknown'} | {ln}"
                      for i, (b, c, u, ln) in enumerate(rows, 1)]

@@ -87,7 +87,8 @@
       "never": [
         "Invent reviews or reputation facts not in SOURCES",
         "Treat an image or photo 'unavailable' notice, or online-only / not sold in stores, as a risk",
-        "Rate a whole merchant high because of one item's delivery or stock line"
+        "Rate a whole merchant high because of one item's delivery or stock line",
+        "Call a store's own sale or discount suspicious unless the price is far below every other offer"
       ],
       "hands_to": "Ranker",
       "tools": [

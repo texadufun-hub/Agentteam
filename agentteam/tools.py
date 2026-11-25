@@ -315,16 +315,20 @@ _PRICE = re.compile(r"\bprice\s*:?\s*(?:CAD\s*)?\$\s*([\d,]+(?:\.\d+)?)", re.I)
 _SHIP = re.compile(r"\bshipping\s*:?\s*(free|unknown|(?:CAD\s*)?\$\s*[\d,]+(?:\.\d+)?)", re.I)
 
 
-def price_order(offers_text, tie=5.0):
+NO_SHIP = re.compile(r"DELIVERY UNAVAILABLE|ship to home: not available", re.I)
+
+
+def price_order(offers_text, tie=5.0, blocked=()):
     """Sort offer lines cheapest first: total cost when shipping is known,
     item price when it is not. Within `tie` dollars, confirmed shipping goes
-    first. Lines marked DELIVERY UNAVAILABLE or without a price are left out.
+    first. Lines without a price, or that can't be shipped (marked in the
+    line or, via `blocked`, in the store's own listing), are left out.
     Returns [(basis, confirmed, url, line)]."""
     rows = []
     for line in offers_text.splitlines():
         urls = URL_RE.findall(line)
         m = _PRICE.search(line)
-        if not urls or not m or "DELIVERY UNAVAILABLE" in line.upper():
+        if not urls or not m or NO_SHIP.search(line) or urls[0].lower() in blocked:
             continue
         price = float(m.group(1).replace(",", ""))
         sh = _SHIP.search(line)

@@ -20,7 +20,10 @@ CACHE = Path(os.environ.get("AGENTTEAM_UFETCH_CACHE",
 
 def _ufetch_search(site, query):
     path = CACHE / f"last_{site}.html"
-    MCP(UFETCH, timeout=300).call("fetch_search", {"site": site, "query": query})
+    out = MCP(UFETCH, timeout=300).call("fetch_search", {"site": site, "query": query})
+    listed = _listings_as_html(out)
+    if listed:  # ufetch parsed listings itself (it then saves no page copy)
+        return listed
     if not path.exists():
         raise RuntimeError(f"ufetch saved no page at {path}")
     # ufetch serves repeat searches from a 15-minute cache without re-saving,
@@ -28,6 +31,27 @@ def _ufetch_search(site, query):
     if time.time() - path.stat().st_mtime > 900:
         raise RuntimeError("ufetch page copy is older than 15 minutes")
     return path.read_text(errors="replace")
+
+
+def _listings_as_html(out):
+    """Turn ufetch's parsed listings (JSON or text with title/price/url)
+    into minimal HTML anchors our extractor already understands."""
+    import html, json, re
+    items = []
+    try:
+        data = json.loads(out)
+        rows = data if isinstance(data, list) else next(
+            (v for v in data.values() if isinstance(v, list)), [])
+        for r in rows:
+            if isinstance(r, dict) and r.get("url"):
+                items.append((f"{r.get('title', '')} {r.get('price', '')}".strip(), r["url"]))
+    except (ValueError, AttributeError, StopIteration):
+        for line in out.splitlines():
+            m = re.search(r"https?://\S+", line)
+            if m:
+                items.append((line.replace(m.group(0), "").strip(" |-:"), m.group(0)))
+    return "".join(f'<a href="{html.escape(u)}">{html.escape(t)}</a> {html.escape(t)}\n'
+                   for t, u in items if t)
 
 
 def newegg(query):

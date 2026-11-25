@@ -114,10 +114,20 @@ class Team:
                 f"\n\nCONTEXT:\n{context}")
         work = llm.chat(agent.prompt(), user, model=agent.model)
         log.write("node", node=name, round=0, output=work, summary=work[:80])
+        allowed = set(tools.URL_RE.findall(user))
         for rnd in range(MAX_FIX_ROUNDS + 1):
-            ok, score, fixes, detail = self.check(agent, task, work)
-            log.write("check", node=name, round=rnd, score=score, ok=ok,
-                      fixes=fixes, detail=detail, summary=score)
+            # URL guard (code, not model): every link must come from the input.
+            invented = [u for u in tools.URL_RE.findall(work) if u not in allowed]
+            if invented:
+                ok, score, detail = False, "0/1 links", []
+                fixes = [f"Remove this link, it is not in your input; use only links copied from your input, or write NO LINK: {u}"
+                         for u in invented[:5]]
+                log.write("check", node=name, round=rnd, score=score, ok=False,
+                          fixes=fixes, detail="URL guard", summary="invented links")
+            else:
+                ok, score, fixes, detail = self.check(agent, task, work)
+                log.write("check", node=name, round=rnd, score=score, ok=ok,
+                          fixes=fixes, detail=detail, summary=score)
             if ok:
                 return {"node": name, "output": work, "score": score, "ok": True}
             if rnd == MAX_FIX_ROUNDS:

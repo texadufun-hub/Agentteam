@@ -3,6 +3,7 @@ you put in the task yourself."""
 import html
 import os
 import re
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -12,6 +13,15 @@ PAGE_CHARS = int(os.environ.get("AGENTTEAM_PAGE_CHARS", "1500"))
 
 
 def fetch_text(url, timeout=20):
+    return fetch_page(url, timeout)[0]
+
+
+PRODUCT_HREF = re.compile(r"/(product|products|ip|dp|p|item|itm)/", re.I)
+
+
+def fetch_page(url, timeout=20):
+    """Return (text, product_links). Links are real hrefs from the page, so
+    agents can cite product pages instead of inventing them."""
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         ctype = r.headers.get_content_type()
@@ -19,8 +29,15 @@ def fetch_text(url, timeout=20):
             raise ValueError(f"not a web page ({ctype})")
         raw = r.read(2_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
     raw = re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", raw)
+    links = []
+    for href, inner in re.findall(r'(?is)<a\b[^>]*href=["\']([^"\'#]+)["\'][^>]*>(.*?)</a>', raw):
+        label = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", inner))).strip()
+        full = urllib.parse.urljoin(url, html.unescape(href))
+        if len(label) >= 12 and (PRODUCT_HREF.search(full) or PRICE_RE.search(label)):
+            if full not in [u for _, u in links]:
+                links.append((label[:90], full))
     text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))
-    return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS]
+    return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS], links[:12]
 
 
 PRICE_RE = re.compile(r"(?:C?\$|CAD\s?)\s?\d[\d,]*(?:\.\d{2})?")
@@ -142,7 +159,11 @@ def search_sources(context, task, per_query=4, max_pages=5):
     hits = [h for h in hits if not skip.search(h["url"])]
     for i, h in enumerate(hits[:max_pages], 1):
         try:
-            body = price_focus(fetch_text(h["url"]))
+            text, links = fetch_page(h["url"])
+            body = price_focus(text)
+            if links:
+                body += "\nPRODUCT LINKS ON THIS PAGE:\n" + "\n".join(
+                    f"- {label} -> {u}" for label, u in links)
         except Exception as e:
             body = f"FETCH FAILED: {e}"
         snip = f"Search snippet: {h['snippet']}\n" if h.get("snippet") else ""

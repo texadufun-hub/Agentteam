@@ -8,7 +8,14 @@ Config comes from environment variables only:
 import json
 import os
 import re
+import threading
 import urllib.request
+
+
+# Strata handles one request at a time: every model call waits its turn,
+# even when graph stages run agents "in parallel". Raise with
+# AGENTTEAM_CONCURRENCY once the server can take more.
+_SLOTS = threading.BoundedSemaphore(int(os.environ.get("AGENTTEAM_CONCURRENCY", "1") or 1))
 
 
 class LLMError(RuntimeError):
@@ -45,7 +52,8 @@ def chat(system, user, model=None, temperature=0.2, timeout=None, retries=1):
     timeout = timeout or int(os.environ.get("AGENTTEAM_TIMEOUT", "900"))
     for attempt in range(retries + 1):
         try:
-            return _chat_once(system, user, model, temperature, timeout)
+            with _SLOTS:
+                return _chat_once(system, user, model, temperature, timeout)
         except LLMError as e:
             if attempt == retries or "timed out" in str(e).lower():
                 raise

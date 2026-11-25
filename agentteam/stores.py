@@ -91,8 +91,10 @@ def _walk_products(node, base, out):
             # Notes go first: link labels are cut at ~90 characters, and a
             # long product name would otherwise push them off the end.
             notes = []
+            # Walmart's plain page answers for its default location
+            # (Mississauga), not the consumer's, so this is not "can't ship".
             if "shipToHome_not_available" in str(node.get("fulfillmentTitle", "")):
-                notes.append("(ship to home: not available)")
+                notes.append("(shipping to your area unknown)")
             if node.get("sellerType") == "EXTERNAL" or node.get("fulfillmentType") == "MARKETPLACE":
                 notes.append("(marketplace third-party seller)")
             if "classType=VARIANT" in url:

@@ -1,0 +1,203 @@
+"""Graph runner: Lead routing, parallel fan-out and join, a Checker quality
+loop capped at 2 rounds, a human approval pause, team memory and run logs."""
+import json
+import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from . import llm, tools
+
+MAX_FIX_ROUNDS = 2
+
+
+@dataclass
+class Agent:
+    name: str
+    job: str
+    input: str
+    output: str
+    done_well: list
+    never: list
+    ask_me_first: list = field(default_factory=list)
+    hands_to: str = "Checker"
+    tools: list = field(default_factory=list)
+    model: str | None = None
+
+    def prompt(self):
+        lines = [
+            f"You are {self.name}.",
+            f"JOB: {self.job}",
+            f"INPUT: {self.input}",
+            f"OUTPUT: {self.output}",
+            "DONE WELL:\n" + "\n".join(f"- {c}" for c in self.done_well),
+            "NEVER:\n" + "\n".join(f"- {c}" for c in self.never),
+        ]
+        if self.ask_me_first:
+            lines.append(
+                "ASK ME FIRST (stop and write ASK: <question> instead):\n"
+                + "\n".join(f"- {c}" for c in self.ask_me_first)
+            )
+        return "\n".join(lines)
+
+
+class RunLog:
+    def __init__(self, root, team):
+        self.dir = Path(root) / "runs" / team
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self.path = self.dir / time.strftime("%Y%m%d-%H%M%S.jsonl")
+
+    def write(self, kind, **data):
+        rec = {"t": time.time(), "kind": kind, **data}
+        with self.path.open("a") as f:
+            f.write(json.dumps(rec) + "\n")
+        tag = data.get("node") or data.get("edge") or ""
+        print(f"[{kind}] {tag}", data.get("summary", ""), flush=True)
+
+
+class Team:
+    def __init__(self, root, name, config):
+        self.root = Path(root)
+        self.name = name
+        self.cfg = config
+        self.agents = {a["name"]: Agent(**a) for a in config["agents"]}
+        self.checker_model = config.get("checker_model")
+        (self.root / "memory").mkdir(exist_ok=True)
+        self.memory_path = self.root / "memory" / f"{name}.md"
+        self._sources = None
+
+    # ---- Lead ---------------------------------------------------------
+    def route(self, task):
+        """Clear if/then rules: first rule whose keywords appear wins."""
+        low = task.lower()
+        for rule in self.cfg.get("routes", []):
+            if any(k.lower() in low for k in rule["if_any"]):
+                return rule["stages"], rule.get("name", "rule")
+        return self.cfg["default_stages"], "default"
+
+    def memory(self):
+        return self.memory_path.read_text() if self.memory_path.exists() else ""
+
+    def remember(self, line):
+        with self.memory_path.open("a") as f:
+            f.write(f"- {time.strftime('%Y-%m-%d')} {line}\n")
+
+    # ---- Checker ------------------------------------------------------
+    def check(self, agent, task, work):
+        checks = "\n".join(f"{i+1}. {c}" for i, c in enumerate(agent.done_well))
+        system = (
+            "You are the Checker. Score work strictly against its DONE WELL "
+            "checks. Be harsh: pass a check only if the work clearly meets it."
+        )
+        user = (
+            f"TASK:\n{task}\n\nAGENT: {agent.name}\nDONE WELL:\n{checks}\n\n"
+            f"WORK:\n{work}\n\n"
+            'Return {"checks":[{"n":1,"pass":true,"why":"..."}],'
+            '"fixes":["exact fix", "..."]}'
+        )
+        res = llm.chat_json(system, user, model=self.checker_model)
+        results = res.get("checks", [])
+        passed = sum(1 for c in results if c.get("pass") is True)
+        total = len(agent.done_well)
+        ok = passed == total and len(results) >= total
+        return ok, f"{passed}/{total}", res.get("fixes", []), results
+
+    # ---- one node + its quality loop ----------------------------------
+    def run_node(self, name, task, context, log):
+        agent = self.agents[name]
+        extra = ""
+        if "fetch_urls" in agent.tools:
+            extra = f"\n\n{self._sources}"
+        user = (f"MEMORY:\n{self.memory()}\n\nTASK:\n{task}{extra}"
+                f"\n\nCONTEXT:\n{context}")
+        work = llm.chat(agent.prompt(), user, model=agent.model)
+        log.write("node", node=name, round=0, output=work, summary=work[:80])
+        for rnd in range(MAX_FIX_ROUNDS + 1):
+            ok, score, fixes, detail = self.check(agent, task, work)
+            log.write("check", node=name, round=rnd, score=score, ok=ok,
+                      fixes=fixes, detail=detail, summary=score)
+            if ok:
+                return {"node": name, "output": work, "score": score, "ok": True}
+            if rnd == MAX_FIX_ROUNDS:
+                break
+            log.write("edge", edge=f"Checker->{name}", carries="fixes",
+                      fixes=fixes, summary=f"round {rnd+1}")
+            fix_user = (
+                f"{user}\n\nYOUR PREVIOUS WORK:\n{work}\n\n"
+                "Apply exactly these fixes and return the full revised work:\n"
+                + "\n".join(f"- {f}" for f in fixes)
+            )
+            work = llm.chat(agent.prompt(), fix_user, model=agent.model)
+            log.write("node", node=name, round=rnd + 1, output=work,
+                      summary=work[:80])
+        return {"node": name, "output": work, "score": score, "ok": False,
+                "still_wrong": fixes}
+
+    # ---- whole graph --------------------------------------------------
+    def run(self, task, approve=None):
+        log = RunLog(self.root, self.name)
+        self._sources = None
+        if any("fetch_urls" in a.tools for a in self.agents.values()):
+            self._sources = tools.fetch_urls(task)
+            log.write("tool", node="fetch_urls", output=self._sources,
+                      summary=f"{len(self._sources)} chars")
+        stages, rule = self.route(task)
+        log.write("route", node="Lead", rule=rule, stages=stages,
+                  summary=f"{rule}: {stages}")
+        context, results = "", []
+        for stage in stages:
+            # fan-out: independent agents in a stage run in parallel
+            with ThreadPoolExecutor(max_workers=len(stage)) as ex:
+                outs = list(ex.map(
+                    lambda n: self.run_node(n, task, context, log), stage))
+            # join
+            for o in outs:
+                log.write("edge", edge=f"{o['node']}->join",
+                          carries="checked output", summary=o["score"])
+            context += "".join(
+                f"\n\n### {o['node']} (score {o['score']})\n{o['output']}"
+                for o in outs)
+            results += outs
+
+        flagged = [r for r in results if not r["ok"]]
+        want = self.cfg.get("final_from")
+        picked = [r for r in results if not want or r["node"] in want] or results
+        final = "\n\n".join(r["output"] for r in picked[-len(want or [1]):])
+        log.write("final", node="Lead", flagged=[f["node"] for f in flagged],
+                  summary="ready for approval")
+
+        # human-in-the-loop pause before anything leaves
+        approve = approve or _ask_human
+        decision = approve(final, flagged)
+        log.write("approval", node="You", approved=decision,
+                  summary="approved" if decision else "held")
+        if decision and self.cfg.get("write_files"):
+            ws = self.root / "workspace" / log.path.stem
+            for rel, body in tools.extract_files(final):
+                dest = (ws / rel.strip()).resolve()
+                if ws.resolve() in dest.parents:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_text(body)
+            log.write("files", node="workspace", path=str(ws), summary=str(ws))
+        self.remember(
+            f"rule={rule} scores="
+            + ",".join(f"{r['node']}:{r['score']}" for r in results)
+            + f" approved={decision}")
+        return {"final": final, "results": results, "approved": decision,
+                "log": str(log.path)}
+
+
+def _ask_human(final, flagged):
+    print("\n========== FINAL (awaiting your approval) ==========\n")
+    print(final)
+    for f in flagged:
+        print(f"\n!! {f['node']} still failing after {MAX_FIX_ROUNDS} rounds:")
+        for s in f.get("still_wrong", []):
+            print(f"   - {s}")
+    return input("\nApprove and release? [y/N] ").strip().lower() == "y"
+
+
+def load_team(name="deal_researcher", root="."):
+    root = Path(root)
+    cfg = json.loads((root / "teams" / f"{name}.json").read_text())
+    return Team(root, name, cfg)

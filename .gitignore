@@ -1,0 +1,6 @@
+runs/
+memory/
+workspace/
+proposal-*.json
+__pycache__/
+.env

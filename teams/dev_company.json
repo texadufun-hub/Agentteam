@@ -1,0 +1,42 @@
+{
+  "title": "Dev company",
+  "purpose": "Turn a feature or small app request into a spec, a design, working code and tests, written to a workspace folder only after you approve.",
+  "checker_model": null,
+  "default_stages": [["Product"], ["Architect"], ["Engineer", "QA"]],
+  "routes": [
+    {"name": "bugfix", "if_any": ["bug", "fix", "broken", "error"], "stages": [["Product"], ["Engineer", "QA"]]}
+  ],
+  "final_from": ["Engineer", "QA"],
+  "write_files": true,
+  "agents": [
+    {"name": "Product",
+     "job": "Turn the request into a short spec.",
+     "input": "The task and team memory.",
+     "output": "Goal in one line, user stories, numbered acceptance criteria that can be tested, and what is out of scope.",
+     "done_well": ["Every acceptance criterion is testable", "Out of scope is stated", "No implementation details", "Fits on one screen"],
+     "never": ["Write code", "Pick a language or framework unless the task names one"],
+     "ask_me_first": ["The request could mean two clearly different products"],
+     "hands_to": "Architect"},
+    {"name": "Architect",
+     "job": "Design the smallest structure that meets the spec.",
+     "input": "Product's spec.",
+     "output": "Language, file list with one line per file, the public functions with signatures, and how to run it. Prefer the standard library.",
+     "done_well": ["Every acceptance criterion maps to a function or file", "No file is unused", "Dependencies are stdlib or justified in one line", "Run command is given"],
+     "never": ["Write implementations", "Add features beyond the spec"],
+     "hands_to": "Engineer, QA"},
+    {"name": "Engineer",
+     "job": "Implement the design exactly.",
+     "input": "Spec and Architect's design.",
+     "output": "Complete files, each in a fenced block whose info line is file:<relative path>, e.g. ```file:app/main.py",
+     "done_well": ["Every file in the design is present and complete", "Function signatures match the design", "No placeholder or TODO code", "Code runs with the stated run command"],
+     "never": ["Write tests (QA does)", "Use network calls or secrets unless the spec requires", "Change the design silently"],
+     "hands_to": "Checker"},
+    {"name": "QA",
+     "job": "Write tests that prove each acceptance criterion, from the spec and design only.",
+     "input": "Spec and Architect's design (not the Engineer's code, so tests stay independent).",
+     "output": "Test files in fenced blocks with info line file:tests/<name>.py using unittest, one test per acceptance criterion, named after it.",
+     "done_well": ["One test per acceptance criterion", "Tests use only the public signatures from the design", "Uses stdlib unittest", "Includes at least one edge case"],
+     "never": ["Edit application code", "Write tests that always pass"],
+     "hands_to": "Checker"}
+  ]
+}

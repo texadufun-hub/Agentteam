@@ -88,14 +88,18 @@ def _walk_products(node, base, out):
         if isinstance(name, str) and isinstance(url, str) and price not in (None, "", {}):
             p = str(price)
             seller = node.get("sellerName") or node.get("sellerDisplayName")
-            note = f" sold by {seller}" if isinstance(seller, str) and seller else ""
-            if node.get("sellerType") == "EXTERNAL" or node.get("fulfillmentType") == "MARKETPLACE":
-                note += " (marketplace third-party seller)"
+            # Notes go first: link labels are cut at ~90 characters, and a
+            # long product name would otherwise push them off the end.
+            notes = []
             if "shipToHome_not_available" in str(node.get("fulfillmentTitle", "")):
-                note += " (ship to home: not available)"
+                notes.append("(ship to home: not available)")
+            if node.get("sellerType") == "EXTERNAL" or node.get("fulfillmentType") == "MARKETPLACE":
+                notes.append("(marketplace third-party seller)")
             if "classType=VARIANT" in url:
-                note += " (from price, varies by option)"
-            out.append((f"{name} {p if '$' in p else '$' + p}{note}", urllib.parse.urljoin(base, url)))
+                notes.append("(from price, varies by option)")
+            by = f" sold by {seller}" if isinstance(seller, str) and seller else ""
+            label = " ".join(notes + [f"{p if '$' in p else '$' + p}{by}", name])
+            out.append((label, urllib.parse.urljoin(base, url)))
         for v in node.values():
             _walk_products(v, base, out)
     elif isinstance(node, list):

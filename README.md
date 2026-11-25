@@ -18,8 +18,10 @@ Plain Python 3.10+, standard library only. Nothing to install.
    export AGENTTEAM_BASE_URL=http://100.97.220.76:8094/v1
    export AGENTTEAM_MODEL=qwen3.8-flash-next-q2_0
    # export AGENTTEAM_API_KEY=...            # only if your server needs one
-   # Search: an MCP search server (e.g. the searx one Strata uses) ...
-   export AGENTTEAM_SEARCH_MCP_URL=http://HOST:PORT/mcp
+   # Search, pick one:
+   export AGENTTEAM_SEARCH=strata          # Strata runs its own search tools
+   # ... or call an MCP search server directly:
+   # export AGENTTEAM_SEARCH_MCP_URL=http://HOST:PORT/mcp
    # ... or a SearXNG instance with JSON output enabled:
    # export AGENTTEAM_SEARX_URL=http://HOST:PORT
    ```

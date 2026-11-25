@@ -59,9 +59,28 @@ def _search_mcp(query, n):
     return hits[:n]
 
 
+def _search_strata(query, n):
+    """Let the server run its own web-search tools (Strata with MCP tools on
+    for API calls), then keep only URLs it returned."""
+    from . import llm
+    text = llm.chat(
+        "Use your web search tool. Do not answer from memory.",
+        f"Search the web for: {query}\nList up to {n} results, one per line: "
+        "URL | title | price if shown. Only URLs you actually got from search.")
+    hits = []
+    for line in text.splitlines():
+        for u in URL_RE.findall(line):
+            if u not in [h["url"] for h in hits]:
+                hits.append({"url": u, "title": line.replace(u, "").strip(" |")[:120],
+                             "snippet": ""})
+    return hits[:n]
+
+
 def search(query, n=6, timeout=20):
     """Search via an MCP search server (AGENTTEAM_SEARCH_MCP_URL, e.g. the
     searx server Strata uses) or a SearXNG instance (AGENTTEAM_SEARX_URL)."""
+    if os.environ.get("AGENTTEAM_SEARCH", "").lower() == "strata":
+        return _search_strata(query, n)
     if os.environ.get("AGENTTEAM_SEARCH_MCP_URL"):
         return _search_mcp(query, n)
     base = os.environ.get("AGENTTEAM_SEARX_URL")

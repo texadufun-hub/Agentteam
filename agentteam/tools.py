@@ -86,7 +86,7 @@ def fetch_page(url, timeout=20):
     return parse_html(raw, url)
 
 
-TRACKING = re.compile(r"^(cmp|utm_\w+|ref|ref_|tag|gclid|fbclid|icid|intcmp|irclickid|clickid|cm_\w+|spm|scm)$", re.I)
+TRACKING = re.compile(r"^(cmp|listid|trk|utm_\w+|ref|ref_|tag|gclid|fbclid|icid|intcmp|irclickid|clickid|cm_\w+|spm|scm)$", re.I)
 
 
 def clean_url(u):

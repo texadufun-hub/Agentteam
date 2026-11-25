@@ -23,6 +23,7 @@ class Agent:
     hands_to: str = "Checker"
     tools: list = field(default_factory=list)
     model: str | None = None
+    max_tokens: int | None = None
 
     def prompt(self):
         lines = [
@@ -113,7 +114,7 @@ class Team:
             extra += f"\n\n{self._search}"
         user = (f"MEMORY:\n{self.memory()}\n\nTASK:\n{task}{extra}"
                 f"\n\nCONTEXT:\n{context}")
-        work = llm.chat(agent.prompt(), user, model=agent.model)
+        work = llm.chat(agent.prompt(), user, model=agent.model, max_tokens=agent.max_tokens)
         log.write("node", node=name, round=0, output=work, summary=work[:80])
         allowed = {u.lower() for u in tools.URL_RE.findall(user)}
         for rnd in range(MAX_FIX_ROUNDS + 1):
@@ -141,7 +142,7 @@ class Team:
                 "Apply exactly these fixes and return the full revised work:\n"
                 + "\n".join(f"- {f}" for f in fixes)
             )
-            work = llm.chat(agent.prompt(), fix_user, model=agent.model)
+            work = llm.chat(agent.prompt(), fix_user, model=agent.model, max_tokens=agent.max_tokens)
             log.write("node", node=name, round=rnd + 1, output=work,
                       summary=work[:80])
         return {"node": name, "output": self.resolve(name, work, log),

@@ -22,7 +22,10 @@ def _ufetch_search(site, query):
     path = CACHE / f"last_{site}.html"
     out = MCP(UFETCH, timeout=300).call("fetch_search", {"site": site, "query": query})
     listed = _listings_as_html(out)
-    if listed:  # ufetch parsed listings itself (it then saves no page copy)
+    # ufetch parsed listings itself (it then saves no page copy). Use them if
+    # they carry prices; otherwise a fresh saved page, if any, is better.
+    fresh = path.exists() and time.time() - path.stat().st_mtime <= 900
+    if listed and ("$" in listed or not fresh):
         return listed
     if not path.exists():
         raise RuntimeError(f"ufetch saved no page at {path}")

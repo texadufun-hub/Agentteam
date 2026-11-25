@@ -1,21 +1,47 @@
 """Read-only tools. Nothing here sends data anywhere except a GET of URLs
 you put in the task yourself."""
 import html
+import os
 import re
 import urllib.request
 from pathlib import Path
 
 URL_RE = re.compile(r"https?://[^\s)>\]\"']+")
-MAX_CHARS = 6000
+MAX_CHARS = 60000
+PAGE_CHARS = int(os.environ.get("AGENTTEAM_PAGE_CHARS", "2500"))
 
 
 def fetch_text(url, timeout=20):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
+        ctype = r.headers.get_content_type()
+        if not (ctype.startswith("text/") or "html" in ctype or "json" in ctype):
+            raise ValueError(f"not a web page ({ctype})")
         raw = r.read(2_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
     raw = re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", raw)
     text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))
     return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS]
+
+
+PRICE_RE = re.compile(r"(?:C?\$|CAD\s?)\s?\d[\d,]*(?:\.\d{2})?")
+
+
+def price_focus(text, limit=None):
+    """Category and product pages bury prices under menus. Keep the page
+    start plus the text around each price so offers survive truncation."""
+    limit = limit or PAGE_CHARS
+    hits = [m.start() for m in PRICE_RE.finditer(text)]
+    if not hits:
+        return text[:limit]
+    out, last = [text[:300]], 300
+    for h in hits:
+        a, b = max(h - 160, last), h + 60
+        if a < b:
+            out.append(text[a:b])
+            last = b
+        if sum(map(len, out)) > limit:
+            break
+    return " … ".join(out)[:limit]
 
 
 def fetch_urls(task):
@@ -24,12 +50,12 @@ def fetch_urls(task):
     out = []
     for i, url in enumerate(dict.fromkeys(URL_RE.findall(task)), 1):
         try:
-            out.append(f"[S{i}] {url}\n{fetch_text(url)}")
+            out.append(f"[S{i}] {url}\n{price_focus(fetch_text(url), 6000)}")
         except Exception as e:
             out.append(f"[S{i}] {url}\nFETCH FAILED: {e}")
     for j, p in enumerate(re.findall(r"file:(\S+)", task), len(out) + 1):
         try:
-            out.append(f"[S{j}] {p}\n{Path(p).expanduser().read_text()[:MAX_CHARS]}")
+            out.append(f"[S{j}] {p}\n{Path(p).expanduser().read_text()[:6000]}")
         except Exception as e:
             out.append(f"[S{j}] {p}\nREAD FAILED: {e}")
     return "SOURCES:\n" + ("\n\n".join(out) if out else "(none provided)")
@@ -95,7 +121,7 @@ def search(query, n=6, timeout=20):
              "snippet": x.get("content", "")} for x in data.get("results", [])[:n]]
 
 
-def search_sources(context, task, per_query=5, max_pages=8):
+def search_sources(context, task, per_query=5, max_pages=6):
     """Run every 'QUERY: ...' line from the context, then read the top pages.
     URLs typed in the task are always included."""
     queries = re.findall(r"(?im)^\s*QUERY:\s*(.+)$", context)[:4] or [task]
@@ -112,12 +138,15 @@ def search_sources(context, task, per_query=5, max_pages=8):
         except Exception as e:
             errors.append(f"search failed for {q!r}: {e}")
     blocks = []
+    skip = re.compile(r"(gstatic\.com|googleusercontent|\.(jpe?g|png|gif|webp|svg|pdf)(\?|$))", re.I)
+    hits = [h for h in hits if not skip.search(h["url"])]
     for i, h in enumerate(hits[:max_pages], 1):
         try:
-            body = fetch_text(h["url"])[:3000]
+            body = price_focus(fetch_text(h["url"]))
         except Exception as e:
-            body = f"FETCH FAILED: {e}. Snippet: {h['snippet']}"
-        blocks.append(f"[S{i}] {h['title']}\n{h['url']}\n{body}")
+            body = f"FETCH FAILED: {e}"
+        snip = f"Search snippet: {h['snippet']}\n" if h.get("snippet") else ""
+        blocks.append(f"[S{i}] {h['title']}\n{h['url']}\n{snip}{body}")
     head = "SOURCES (from search):\n" + ("\n".join(errors) + "\n" if errors else "")
     return head + ("\n\n".join(blocks) if blocks else "(no results)")
 
@@ -162,4 +191,4 @@ def link_offers(ranked_text, programs, join_queue_path):
             for d in dict.fromkeys(missing):
                 if f"- {d}\n" not in have:
                     f.write(f"- {d}\n")
-    return linked, missing
+    return linked, list(dict.fromkeys(missing))

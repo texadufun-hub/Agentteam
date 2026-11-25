@@ -39,7 +39,18 @@ def _cfg(model=None):
     return base.rstrip("/"), mdl, os.environ.get("AGENTTEAM_API_KEY")
 
 
-def chat(system, user, model=None, temperature=0.2, timeout=600):
+def chat(system, user, model=None, temperature=0.2, timeout=None, retries=1):
+    """One retry on timeout or connection errors (local servers get busy)."""
+    timeout = timeout or int(os.environ.get("AGENTTEAM_TIMEOUT", "900"))
+    for attempt in range(retries + 1):
+        try:
+            return _chat_once(system, user, model, temperature, timeout)
+        except LLMError:
+            if attempt == retries:
+                raise
+
+
+def _chat_once(system, user, model, temperature, timeout):
     base, mdl, key = _cfg(model)
     body = {
         "model": mdl,

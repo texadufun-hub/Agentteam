@@ -154,6 +154,15 @@ class Team:
             return ("\n\n### LINKED OFFERS (use these links exactly)\n" + linked)
         raise ValueError(f"unknown tool node {name}")
 
+    def safe_node(self, name, task, context, log):
+        """A model error fails this node, not the whole run."""
+        try:
+            return self.run_node(name, task, context, log)
+        except llm.LLMError as e:
+            log.write("error", node=name, error=str(e), summary=str(e)[:80])
+            return {"node": name, "output": f"[{name} failed: {e}]",
+                    "score": "error", "ok": False, "still_wrong": [str(e)]}
+
     # ---- whole graph --------------------------------------------------
     def run(self, task, approve=None):
         log = RunLog(self.root, self.name)
@@ -184,7 +193,7 @@ class Team:
             # fan-out: independent agents in a stage run in parallel
             with ThreadPoolExecutor(max_workers=len(stage)) as ex:
                 outs = list(ex.map(
-                    lambda n: self.run_node(n, task, context, log), stage))
+                    lambda n: self.safe_node(n, task, context, log), stage))
             # join
             for o in outs:
                 log.write("edge", edge=f"{o['node']}->join",

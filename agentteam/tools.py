@@ -17,7 +17,8 @@ def fetch_text(url, timeout=20):
 
 
 PRODUCT_HREF = re.compile(r"/(product|products|ip|dp|p|item|itm)/", re.I)
-SKIP_HREF = re.compile(r"(gift|collection|/cat/|/category/|/shop/|/browse/|/search)", re.I)
+SKIP_HREF = re.compile(r"(gift|collection|/cat/|/category/|/shop/|/browse/|/search|/p/pl\b|refurbished)", re.I)
+BUTTON_TEXT = re.compile(r"^(compare|quick view|add to cart|see details|view details|shop now|learn more|\W)+$", re.I)
 _STOP = {"the", "and", "for", "with", "stand", "laptop", "black", "white", "new", "only", "at"}
 
 
@@ -88,7 +89,7 @@ def fetch_page(url, timeout=20):
 def parse_html(raw, url):
     """(text, product_links) from raw HTML; url resolves relative links."""
     raw = re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", raw)
-    links = []
+    links, weak = [], set()  # weak: labels guessed from the URL slug
     for attrs, inner in re.findall(r'(?is)<a\b([^>]*)>(.*?)</a>', raw):
         # Unescape first: hrefs like ?cmp&#x3D;seo contain '#' entities.
         m = re.search(r'href=["\']([^"\']+)["\']', html.unescape(attrs))
@@ -98,15 +99,26 @@ def parse_html(raw, url):
         if not PRODUCT_HREF.search(full) or SKIP_HREF.search(full):
             continue
         label = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", inner))).strip()
+        if BUTTON_TEXT.match(re.sub(r"\s+", " ", label)):
+            label = ""
         if len(label) < 12:  # image-only anchors: try attributes, then the URL slug
             alt = re.search(r'(?:aria-label|title|alt)=["\']([^"\']{12,})["\']', attrs + inner)
             label = html.unescape(alt.group(1)) if alt else ""
         if len(label) < 12:
             slug = urllib.parse.urlparse(full).path.rstrip("/").split("/")
             label = max(slug, key=len).replace("-", " ") if slug else ""
+            weak.add(full.split("?")[0].lower())
         key = full.split("?")[0].lower()
-        if len(label) >= 12 and key not in [u.split("?")[0].lower() for _, u in links]:
+        if len(label) < 12:
+            continue
+        prev = next((n for n, (_, u) in enumerate(links) if u.split("?")[0].lower() == key), None)
+        if prev is None:
             links.append((label[:90], full))
+        elif key in weak and not label.islower():
+            weak.discard(key)
+            links[prev] = ((label + " " + " ".join(PRICE_RE.findall(links[prev][0])))[:120].strip(), links[prev][1])
+        elif PRICE_RE.search(label) and not PRICE_RE.search(links[prev][0]):
+            links[prev] = ((links[prev][0] + " " + label)[:120], links[prev][1])
     text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))
     return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS], links
 

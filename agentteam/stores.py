@@ -77,7 +77,16 @@ def staples(query):
 
 def costco(query):
     url = "https://www.costco.ca/s?" + urllib.parse.urlencode({"keyword": query})
-    return url, _costco_tiles(_ufetch_search("costco_ca", query), url)
+    rows = _costco_tiles(_ufetch_search("costco_ca", query), url)
+    # Costco sometimes serves a recommendations page instead of results
+    # (pianos for "earbuds"). Keep only tiles that share a query word.
+    import re
+    words = {w for w in re.findall(r"[a-z0-9]{4,}", query.lower()) if w not in {"under", "dollars", "with", "best", "cheap"}}
+    stems = {w.rstrip("s") for w in words}
+    kept = [r for r in rows.splitlines() if r.startswith("<a ") and any(st in r.lower() for st in stems)]
+    if rows.startswith("<a ") and not kept:
+        raise RuntimeError("Costco returned no results matching the search (recommendations page)")
+    return url, "\n".join(kept) if kept else rows
 
 
 def _costco_tiles(raw, base):

@@ -324,8 +324,11 @@ def price_seen(price, line, url, evidence, labels=None, before=160, after=15):
     prices on listing pages) holding its URL or two of its name words."""
     want = f"{price:.2f}".rstrip("0").rstrip(".")
     pat = re.compile(r"\$\s*" + re.escape(want).replace(r"\.", r"\.") + r"(?:0*)?(?!\d)")
+    # Stores split prices into spans ("$ 59 .99"); join them back first.
+    join = lambda t: re.sub(r"\$\s*(\d[\d,]*)\s*\.\s*(\d{2})(?!\d)", r"$\1.\2", t)
+    evidence = join(evidence)
     for label in labels or []:
-        if pat.search(label):
+        if pat.search(join(label)):
             return True
     name = (_tokens(line.replace(url, "")) - GENERIC)
     name = {w for w in name if len(w) >= 4 and not re.fullmatch(r"[\d.,]+", w)

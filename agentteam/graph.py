@@ -134,6 +134,11 @@ class Team:
             misordered = []
             if name in self.cfg.get("must_follow_order", []) and self._order:
                 pos = {u.lower(): i for i, u in enumerate(self._order)}
+                offered = {u.lower() for r in reversed(context.split("### ")) if r.startswith(self.cfg.get("order_from", "Verifier"))
+                           for u in tools.URL_RE.findall(r)}
+                for u in dict.fromkeys(tools.URL_RE.findall(work)):
+                    if u.lower() in offered and u.lower() not in pos:
+                        misordered.append(f"Remove {u}: it is not in PRICE ORDER (its price or shipping was not confirmed in the sources).")
                 picks = [u for u in dict.fromkeys(tools.URL_RE.findall(work)) if u.lower() in pos]
                 for a, b in zip(picks, picks[1:]):
                     if pos[b.lower()] < pos[a.lower()]:

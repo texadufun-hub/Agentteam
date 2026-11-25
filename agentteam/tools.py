@@ -51,10 +51,12 @@ def resolve_product_links(text, links_by_source):
             pool = [l for l in pool if _domain(l[1]) == _domain(u)]
             if not pool:
                 continue
+            def pkey(link):  # same product id = same product, even if URLs differ
+                ids = re.findall(r"\d{5,}", urllib.parse.urlparse(link).path)
+                return ids[-1] if ids else link.split("?")[0].lower()
             freq = {}
-            for label, _ in pool:
-                for t in _tokens(label) - GENERIC:
-                    freq[t] = freq.get(t, 0) + 1
+            for t in {(t, pkey(pu)) for label, pu in pool for t in _tokens(label) - GENERIC}:
+                freq[t[0]] = freq.get(t[0], 0) + 1
             words = (_tokens(line.replace(u, "")) - GENERIC)
             distinctive = {w for w in words if len(w) >= 4 and freq.get(w) == 1}
             # Model codes (letters+digits, e.g. LS01) must not conflict.
@@ -63,7 +65,7 @@ def resolve_product_links(text, links_by_source):
             matches = [(label, pu) for label, pu in pool
                        if distinctive & _tokens(label)
                        and not (mine and model(_tokens(label)) and not mine & model(_tokens(label)))]
-            if len({pu for _, pu in matches}) == 1:
+            if matches and len({pkey(pu) for _, pu in matches}) == 1:
                 best = matches[0][1]
                 line = line.replace(u, best)
                 swaps.append([u, best, matches[0][0]])
@@ -79,15 +81,27 @@ def fetch_page(url, timeout=20):
         ctype = r.headers.get_content_type()
         if not (ctype.startswith("text/") or "html" in ctype or "json" in ctype):
             raise ValueError(f"not a web page ({ctype})")
-        raw = r.read(2_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
+        raw = r.read(8_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
     raw = re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", raw)
     links = []
-    for href, inner in re.findall(r'(?is)<a\b[^>]*href=["\']([^"\'#]+)["\'][^>]*>(.*?)</a>', raw):
+    for attrs, inner in re.findall(r'(?is)<a\b([^>]*)>(.*?)</a>', raw):
+        # Unescape first: hrefs like ?cmp&#x3D;seo contain '#' entities.
+        m = re.search(r'href=["\']([^"\']+)["\']', html.unescape(attrs))
+        if not m or m.group(1).startswith("#"):
+            continue
+        full = urllib.parse.urljoin(url, m.group(1).split("#")[0])
+        if not PRODUCT_HREF.search(full) or SKIP_HREF.search(full):
+            continue
         label = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", inner))).strip()
-        full = urllib.parse.urljoin(url, html.unescape(href))
-        if len(label) >= 12 and PRODUCT_HREF.search(full) and not SKIP_HREF.search(full):
-            if full not in [u for _, u in links]:
-                links.append((label[:90], full))
+        if len(label) < 12:  # image-only anchors: try attributes, then the URL slug
+            alt = re.search(r'(?:aria-label|title|alt)=["\']([^"\']{12,})["\']', attrs + inner)
+            label = html.unescape(alt.group(1)) if alt else ""
+        if len(label) < 12:
+            slug = urllib.parse.urlparse(full).path.rstrip("/").split("/")
+            label = max(slug, key=len).replace("-", " ") if slug else ""
+        key = full.split("?")[0].lower()
+        if len(label) >= 12 and key not in [u.split("?")[0].lower() for _, u in links]:
+            links.append((label[:90], full))
     text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))
     return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS], links
 

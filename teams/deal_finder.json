@@ -52,12 +52,13 @@
       "name": "Verifier",
       "job": "Turn the search SOURCES into a verified list of real offers.",
       "input": "The brief and SOURCES.",
-      "output": "One line per offer: product, merchant, URL, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. URL: copy the matching PRODUCT LINKS entry if the same product is listed there, otherwise the page URL. Always include the [S#] of the page. List every matching product with a price, not just one. Drop items that are not the product asked for. Write DELIVERY UNAVAILABLE only if the text right next to that item says delivery or shipping is unavailable (not image or stock notices). List each product once. At most 8 offers, cheapest first. Tag each offer with its VARIANT from the title or part number (e.g. SO-DIMM, UDIMM, RDIMM), or VARIANT UNKNOWN.",
+      "output": "One line per offer: product, merchant, URL, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. URL: copy the matching PRODUCT LINKS entry if the same product is listed there, otherwise the page URL. Always include the [S#] of the page. List every matching product with a price, not just one. Drop items that are not the product asked for. Write DELIVERY UNAVAILABLE only if the text right next to that item says delivery or shipping is unavailable (not image or stock notices). List each product once. At most 8 offers, cheapest first. Tag each offer with its VARIANT from the title or part number (e.g. SO-DIMM, UDIMM, RDIMM), or VARIANT UNKNOWN. Stock and return policy: give them only when the text right next to that item states them; otherwise write UNKNOWN. Page-wide filter, sort or menu text (e.g. 'in 30 Days', 'In Stock' filters) is not about any item.",
       "done_well": [
         "Every offer cites a source and its URL is copied exactly",
         "Total cost includes shipping when shown",
         "Unknown values marked UNKNOWN, never guessed",
-        "Non-matching products are excluded"
+        "Non-matching products are excluded",
+        "Stock and returns come from text next to the item, never from page filters or menus; otherwise UNKNOWN"
       ],
       "never": [
         "Invent a URL, price or merchant",

@@ -83,14 +83,15 @@ class Team:
             f.write(f"- {time.strftime('%Y-%m-%d')} {line}\n")
 
     # ---- Checker ------------------------------------------------------
-    def check(self, agent, task, work):
+    def check(self, agent, task, work, seen=""):
         checks = "\n".join(f"{i+1}. {c}" for i, c in enumerate(agent.done_well))
         system = (
             "You are the Checker. Score work strictly against its DONE WELL "
             "checks. Be harsh: pass a check only if the work clearly meets it."
         )
         user = (
-            f"TASK:\n{task}\n\nAGENT: {agent.name}\nDONE WELL:\n{checks}\n\n"
+            f"TASK:\n{task}\n\nINPUT THE AGENT WAS GIVEN (may be cut):\n{seen[-4000:]}"
+            f"\n\nAGENT: {agent.name}\nDONE WELL:\n{checks}\n\n"
             f"WORK:\n{work}\n\n"
             'Return {"checks":[{"n":1,"pass":true,"why":"..."}],'
             '"fixes":["exact fix", "..."]}'
@@ -125,11 +126,12 @@ class Team:
                 log.write("check", node=name, round=rnd, score=score, ok=False,
                           fixes=fixes, detail="URL guard", summary="invented links")
             else:
-                ok, score, fixes, detail = self.check(agent, task, work)
+                ok, score, fixes, detail = self.check(agent, task, work, context)
                 log.write("check", node=name, round=rnd, score=score, ok=ok,
                           fixes=fixes, detail=detail, summary=score)
             if ok:
-                return {"node": name, "output": work, "score": score, "ok": True}
+                return {"node": name, "output": self.resolve(name, work, log),
+                        "score": score, "ok": True}
             if rnd == MAX_FIX_ROUNDS:
                 break
             log.write("edge", edge=f"Checker->{name}", carries="fixes",
@@ -142,8 +144,18 @@ class Team:
             work = llm.chat(agent.prompt(), fix_user, model=agent.model)
             log.write("node", node=name, round=rnd + 1, output=work,
                       summary=work[:80])
-        return {"node": name, "output": work, "score": score, "ok": False,
-                "still_wrong": fixes}
+        return {"node": name, "output": self.resolve(name, work, log),
+                "score": score, "ok": False, "still_wrong": fixes}
+
+    def resolve(self, name, work, log):
+        """Code step: swap category-page links for the matching product link."""
+        if name not in self.cfg.get("resolve_product_links", []) or not self._search:
+            return work
+        new, swaps = tools.resolve_product_links(work, self._search)
+        if swaps:
+            log.write("tool", node="product_links", swaps=swaps,
+                      summary=f"{len(swaps)} links pointed to product pages")
+        return new
 
     # ---- code tool nodes (deterministic, no LLM) ----------------------
     def run_tool(self, name, task, context, results, log):

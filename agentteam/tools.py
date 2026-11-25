@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-URL_RE = re.compile(r"https?://[^\s)>\]\"']+")
+URL_RE = re.compile(r"https?://[^\s)>\]\"'<]*[^\s)>\]\"'<.,;:!?]")
 MAX_CHARS = 60000
 PAGE_CHARS = int(os.environ.get("AGENTTEAM_PAGE_CHARS", "1500"))
 
@@ -17,6 +17,36 @@ def fetch_text(url, timeout=20):
 
 
 PRODUCT_HREF = re.compile(r"/(product|products|ip|dp|p|item|itm)/", re.I)
+SKIP_HREF = re.compile(r"(gift|collection|/cat/|/category/|/shop/|/browse/|/search)", re.I)
+_STOP = {"the", "and", "for", "with", "stand", "laptop", "black", "white", "new", "only", "at"}
+
+
+def _tokens(t):
+    return {w for w in re.findall(r"[^\W_]{3,}", t.lower()) if w not in _STOP}
+
+
+def resolve_product_links(text, sources):
+    """For each line citing a non-product URL, use the PRODUCT LINKS entry on
+    the same site whose label best matches the line. Returns (text, swaps)."""
+    plinks = re.findall(r"^- (.+?) -> (https?://\S+)$", sources, re.M)
+    out, swaps = [], []
+    for line in text.splitlines():
+        for u in URL_RE.findall(line):
+            if PRODUCT_HREF.search(u) and not SKIP_HREF.search(u):
+                continue
+            words = _tokens(line.replace(u, ""))
+            best, score = None, 1
+            for label, pu in plinks:
+                if _domain(pu) != _domain(u):
+                    continue
+                sc = len(words & _tokens(label))
+                if sc > score:
+                    best, score = pu, sc
+            if best:
+                line = line.replace(u, best)
+                swaps.append([u, best])
+        out.append(line)
+    return "\n".join(out), swaps
 
 
 def fetch_page(url, timeout=20):
@@ -33,7 +63,7 @@ def fetch_page(url, timeout=20):
     for href, inner in re.findall(r'(?is)<a\b[^>]*href=["\']([^"\'#]+)["\'][^>]*>(.*?)</a>', raw):
         label = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", inner))).strip()
         full = urllib.parse.urljoin(url, html.unescape(href))
-        if len(label) >= 12 and (PRODUCT_HREF.search(full) or PRICE_RE.search(label)):
+        if len(label) >= 12 and PRODUCT_HREF.search(full) and not SKIP_HREF.search(full):
             if full not in [u for _, u in links]:
                 links.append((label[:90], full))
     text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))

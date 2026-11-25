@@ -89,9 +89,9 @@
       "name": "Ranker",
       "job": "Rank the offers on value to the consumer only. If shipping is UNKNOWN, rank on item price and mark shipping as unconfirmed; do not disqualify for that alone.",
       "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
-      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, total cost, why it ranks there, and the risk rating. Then GOOD DEAL: yes/no for #1 with one reason.",
+      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason.",
       "done_well": [
-        "Ranking follows total cost, must-haves and risk",
+        "Ranking follows price, must-haves and risk, and any tie is broken by a stated rule",
         "URLs copied exactly from Verifier",
         "High-risk offers are not ranked #1 unless the reason is stated; unknown shipping is flagged, not disqualifying",
         "GOOD DEAL verdict is given and justified"
@@ -109,7 +109,7 @@
       "output": "A short friendly reply: the #1 pick with total cost and why, then #2 and #3 in one line each, each with its link copied exactly from LINKED OFFERS. If GOOD DEAL is no, say waiting may be better.",
       "done_well": [
         "Every link is copied exactly from LINKED OFFERS",
-        "States total cost for #1",
+        "States the #1 item price and whether shipping is confirmed",
         "Under 150 words",
         "Honest about the GOOD DEAL verdict"
       ],
@@ -120,5 +120,8 @@
       ],
       "hands_to": "You"
     }
+  ],
+  "resolve_product_links": [
+    "Verifier"
   ]
 }

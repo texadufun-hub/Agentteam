@@ -108,6 +108,8 @@ class Team:
         extra = ""
         if "fetch_urls" in agent.tools:
             extra = f"\n\n{self._sources}"
+        if "sources" in agent.tools and self._search:
+            extra += f"\n\n{self._search}"
         user = (f"MEMORY:\n{self.memory()}\n\nTASK:\n{task}{extra}"
                 f"\n\nCONTEXT:\n{context}")
         work = llm.chat(agent.prompt(), user, model=agent.model)
@@ -136,10 +138,13 @@ class Team:
     # ---- code tool nodes (deterministic, no LLM) ----------------------
     def run_tool(self, name, task, context, results, log):
         if name == "@search":
+            # Kept out of the shared context: only agents with the "sources"
+            # tool see it, which keeps later prompts short for a local model.
             out = tools.search_sources(context, task)
+            self._search = out
             log.write("tool", node="search", output=out,
                       summary=f"{out.count('[S')} pages")
-            return f"\n\n{out}"
+            return "" if "[S1]" in out else out
         if name == "@link":
             # Runs only after ranking, so ranking never sees affiliate status.
             ranked = next(r["output"] for r in reversed(results)
@@ -168,6 +173,7 @@ class Team:
         log = RunLog(self.root, self.name)
         self._sources = None
         self._linked = None
+        self._search = None
         if any("fetch_urls" in a.tools for a in self.agents.values()):
             self._sources = tools.fetch_urls(task)
             log.write("tool", node="fetch_urls", output=self._sources,
@@ -180,7 +186,7 @@ class Team:
             if isinstance(stage, str) and stage.startswith("@"):
                 out = self.run_tool(stage, task, context, results, log)
                 context += out
-                if stage == "@search" and "[S1]" not in out:
+                if stage == "@search" and "[S1]" not in (self._search or ""):
                     # Nothing to verify: stop instead of making agents argue
                     # with the Checker over offers that don't exist.
                     log.write("route", node="Lead", rule="no-results",

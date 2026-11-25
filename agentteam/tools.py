@@ -8,7 +8,7 @@ from pathlib import Path
 
 URL_RE = re.compile(r"https?://[^\s)>\]\"']+")
 MAX_CHARS = 60000
-PAGE_CHARS = int(os.environ.get("AGENTTEAM_PAGE_CHARS", "2500"))
+PAGE_CHARS = int(os.environ.get("AGENTTEAM_PAGE_CHARS", "1500"))
 
 
 def fetch_text(url, timeout=20):
@@ -121,7 +121,7 @@ def search(query, n=6, timeout=20):
              "snippet": x.get("content", "")} for x in data.get("results", [])[:n]]
 
 
-def search_sources(context, task, per_query=5, max_pages=6):
+def search_sources(context, task, per_query=4, max_pages=5):
     """Run every 'QUERY: ...' line from the context, then read the top pages.
     URLs typed in the task are always included."""
     queries = re.findall(r"(?im)^\s*QUERY:\s*(.+)$", context)[:4] or [task]

@@ -40,13 +40,14 @@ def _cfg(model=None):
 
 
 def chat(system, user, model=None, temperature=0.2, timeout=None, retries=1):
-    """One retry on timeout or connection errors (local servers get busy)."""
+    """Retry once on a refused/reset connection, never on a timeout: a local
+    server keeps generating after we give up, so a retry would pile up work."""
     timeout = timeout or int(os.environ.get("AGENTTEAM_TIMEOUT", "900"))
     for attempt in range(retries + 1):
         try:
             return _chat_once(system, user, model, temperature, timeout)
-        except LLMError:
-            if attempt == retries:
+        except LLMError as e:
+            if attempt == retries or "timed out" in str(e).lower():
                 raise
 
 

@@ -2,47 +2,123 @@
   "title": "Deal finder",
   "purpose": "A consumer asks for a product. The team finds and verifies offers, ranks them on value alone, then attaches your affiliate link where you have one. Merchants without a program go to join_queue.md for you to consider.",
   "checker_model": null,
-  "default_stages": [["Intake"], "@search", ["Verifier", "Risk"], ["Ranker"], "@link", ["Writer"]],
+  "default_stages": [
+    [
+      "Intake"
+    ],
+    "@search",
+    [
+      "Verifier",
+      "Risk"
+    ],
+    [
+      "Ranker"
+    ],
+    "@link",
+    [
+      "Writer"
+    ]
+  ],
   "routes": [],
-  "final_from": ["Writer"],
+  "final_from": [
+    "Writer"
+  ],
   "link_from": "Ranker",
   "disclosure": "Disclosure: some links above may be affiliate links. If you buy through them we may earn a commission at no extra cost to you. Rankings are decided before links are added and are not affected by commissions.",
   "agents": [
-    {"name": "Intake",
-     "job": "Turn the consumer's request into a precise shopping brief and search queries.",
-     "input": "The consumer's request.",
-     "output": "PRODUCT, BUDGET, COUNTRY (default Canada), MUST-HAVES, NICE-TO-HAVES, then 2 to 4 lines starting exactly with QUERY: that would find current offers (include price or buy and the country).",
-     "done_well": ["Every field present, unknowns marked UNKNOWN", "2 to 4 QUERY: lines", "Queries are specific enough to find the product, not the category", "Nothing invented about the consumer"],
-     "never": ["Recommend a product", "Mention affiliates or commissions"],
-     "ask_me_first": ["The request is too vague to name a product type"],
-     "hands_to": "search"},
-    {"name": "Verifier",
-     "job": "Turn the search SOURCES into a verified list of real offers.",
-     "input": "The brief and SOURCES.",
-     "output": "One line per offer: product, merchant, URL exactly as in SOURCES, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. Drop pages that are not an offer for the product.",
-     "done_well": ["Every offer cites a source and its URL is copied exactly", "Total cost includes shipping when shown", "Unknown values marked UNKNOWN, never guessed", "Non-matching products are excluded"],
-     "never": ["Invent a URL, price or merchant", "Rank or recommend"],
-     "hands_to": "Ranker"},
-    {"name": "Risk",
-     "job": "Flag merchants or offers that a consumer should be careful with.",
-     "input": "The brief and SOURCES.",
-     "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch).",
-     "done_well": ["Each risk quotes the triggering text", "Every merchant in SOURCES gets a rating", "Says plainly when no risk was found", "No generic filler"],
-     "never": ["Invent reviews or reputation facts not in SOURCES"],
-     "hands_to": "Ranker"},
-    {"name": "Ranker",
-     "job": "Rank the offers on value to the consumer only.",
-     "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
-     "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, total cost, why it ranks there, and the risk rating. Then GOOD DEAL: yes/no for #1 with one reason.",
-     "done_well": ["Ranking follows total cost, must-haves and risk", "URLs copied exactly from Verifier", "High-risk offers are not ranked #1 unless the reason is stated", "GOOD DEAL verdict is given and justified"],
-     "never": ["Consider affiliate programs or commissions", "Invent offers not in Verifier's list"],
-     "hands_to": "link"},
-    {"name": "Writer",
-     "job": "Write the reply the consumer will read.",
-     "input": "The brief and LINKED OFFERS.",
-     "output": "A short friendly reply: the #1 pick with total cost and why, then #2 and #3 in one line each, each with its link copied exactly from LINKED OFFERS. If GOOD DEAL is no, say waiting may be better.",
-     "done_well": ["Every link is copied exactly from LINKED OFFERS", "States total cost for #1", "Under 150 words", "Honest about the GOOD DEAL verdict"],
-     "never": ["Change, shorten or invent a link", "Hide a risk Ranker listed for the #1 pick", "Write the disclosure (the system adds it)"],
-     "hands_to": "You"}
+    {
+      "name": "Intake",
+      "job": "Turn the consumer's request into a precise shopping brief and search queries.",
+      "input": "The consumer's request.",
+      "output": "PRODUCT, BUDGET, COUNTRY (default Canada), MUST-HAVES, NICE-TO-HAVES, then 2 to 4 lines starting exactly with QUERY: that would find current offers (include price or buy and the country).",
+      "done_well": [
+        "Every field present, unknowns marked UNKNOWN",
+        "2 to 4 QUERY: lines",
+        "Queries are specific enough to find the product, not the category",
+        "Nothing invented about the consumer"
+      ],
+      "never": [
+        "Recommend a product",
+        "Mention affiliates or commissions"
+      ],
+      "ask_me_first": [
+        "The request is too vague to name a product type"
+      ],
+      "hands_to": "search"
+    },
+    {
+      "name": "Verifier",
+      "job": "Turn the search SOURCES into a verified list of real offers.",
+      "input": "The brief and SOURCES.",
+      "output": "One line per offer: product, merchant, URL exactly as in SOURCES, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. Drop pages that are not an offer for the product.",
+      "done_well": [
+        "Every offer cites a source and its URL is copied exactly",
+        "Total cost includes shipping when shown",
+        "Unknown values marked UNKNOWN, never guessed",
+        "Non-matching products are excluded"
+      ],
+      "never": [
+        "Invent a URL, price or merchant",
+        "Rank or recommend"
+      ],
+      "hands_to": "Ranker",
+      "tools": [
+        "sources"
+      ]
+    },
+    {
+      "name": "Risk",
+      "job": "Flag merchants or offers that a consumer should be careful with.",
+      "input": "The brief and SOURCES.",
+      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch).",
+      "done_well": [
+        "Each risk quotes the triggering text",
+        "Every merchant in SOURCES gets a rating",
+        "Says plainly when no risk was found",
+        "No generic filler"
+      ],
+      "never": [
+        "Invent reviews or reputation facts not in SOURCES"
+      ],
+      "hands_to": "Ranker",
+      "tools": [
+        "sources"
+      ]
+    },
+    {
+      "name": "Ranker",
+      "job": "Rank the offers on value to the consumer only.",
+      "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
+      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, total cost, why it ranks there, and the risk rating. Then GOOD DEAL: yes/no for #1 with one reason.",
+      "done_well": [
+        "Ranking follows total cost, must-haves and risk",
+        "URLs copied exactly from Verifier",
+        "High-risk offers are not ranked #1 unless the reason is stated",
+        "GOOD DEAL verdict is given and justified"
+      ],
+      "never": [
+        "Consider affiliate programs or commissions",
+        "Invent offers not in Verifier's list"
+      ],
+      "hands_to": "link"
+    },
+    {
+      "name": "Writer",
+      "job": "Write the reply the consumer will read.",
+      "input": "The brief and LINKED OFFERS.",
+      "output": "A short friendly reply: the #1 pick with total cost and why, then #2 and #3 in one line each, each with its link copied exactly from LINKED OFFERS. If GOOD DEAL is no, say waiting may be better.",
+      "done_well": [
+        "Every link is copied exactly from LINKED OFFERS",
+        "States total cost for #1",
+        "Under 150 words",
+        "Honest about the GOOD DEAL verdict"
+      ],
+      "never": [
+        "Change, shorten or invent a link",
+        "Hide a risk Ranker listed for the #1 pick",
+        "Write the disclosure (the system adds it)"
+      ],
+      "hands_to": "You"
+    }
   ]
 }

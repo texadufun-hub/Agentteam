@@ -95,13 +95,13 @@
     },
     {
       "name": "Ranker",
-      "job": "Rank the offers on value to the consumer only, by total cost (item + shipping) where it is known. Unknown shipping is a cost risk, not a disqualifier: an offer with unknown shipping ranks above one with a confirmed total only if its item price is more than 15% lower, and you must say so.",
+      "job": "Rank the offers on value to the consumer only: cheapest first, using total cost (item + shipping) where shipping is known and item price where it is UNKNOWN. Mark unknown shipping as unconfirmed; do not disqualify for that alone. If two offers are within $5 of each other, prefer the one with confirmed shipping.",
       "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
       "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then confirmed domestic delivery over overseas shipping, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason. State the deciding tie-breaker once, and do not contradict it. If the brief's VARIANT is known, rank only offers of that variant. If it is UNKNOWN and offers differ in variant, never mix them: rank the top 3 of the most common consumer variant, say which, and name the best offer of each other variant in one line.",
       "done_well": [
         "Ranking follows price, must-haves and risk, and any tie is broken by a stated rule",
         "URLs copied exactly from Verifier",
-        "High-risk offers are not ranked #1 unless the reason is stated; a confirmed total beats an unknown-shipping offer within 15% of it",
+        "Order follows the cheapest-first rule; within $5, confirmed shipping wins; high-risk offers are not ranked #1 unless the reason is stated",
         "GOOD DEAL verdict is given and justified"
       ],
       "never": [

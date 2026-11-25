@@ -89,6 +89,10 @@ def _walk_products(node, base, out):
             p = str(price)
             seller = node.get("sellerName") or node.get("sellerDisplayName")
             note = f" sold by {seller}" if isinstance(seller, str) and seller else ""
+            if node.get("sellerType") == "EXTERNAL" or node.get("fulfillmentType") == "MARKETPLACE":
+                note += " (marketplace third-party seller)"
+            if "shipToHome_not_available" in str(node.get("fulfillmentTitle", "")):
+                note += " (ship to home: not available)"
             if "classType=VARIANT" in url:
                 note += " (from price, varies by option)"
             out.append((f"{name} {p if '$' in p else '$' + p}{note}", urllib.parse.urljoin(base, url)))

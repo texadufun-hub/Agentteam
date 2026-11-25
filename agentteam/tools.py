@@ -25,26 +25,48 @@ def _tokens(t):
     return {w for w in re.findall(r"[^\W_]{3,}", t.lower()) if w not in _STOP}
 
 
-def resolve_product_links(text, sources):
-    """For each line citing a non-product URL, use the PRODUCT LINKS entry on
-    the same site whose label best matches the line. Returns (text, swaps)."""
-    plinks = re.findall(r"^- (.+?) -> (https?://\S+)$", sources, re.M)
+GENERIC = _STOP | {"adjustable", "folding", "foldable", "portable", "aluminum",
+    "aluminium", "desk", "table", "tables", "monitor", "holder", "riser", "notebook",
+    "ergonomic", "silver", "grey", "gray", "beige", "birch", "space", "universal",
+    "tabletop", "computer", "tablet", "base", "height", "inch", "cad", "best", "buy",
+    "ikea", "walmart", "amazon", "canada", "shipping", "unknown", "price", "total",
+    "stock", "return", "days", "free", "offer", "product", "merchant", "url", "laptops"}
+
+# Full product-link lists from the last search, keyed by source number.
+LAST_LINKS = {}
+
+
+def resolve_product_links(text, links_by_source):
+    """For each line citing a non-product URL, swap in a product link only
+    when a distinctive name (brand/model) matches exactly one product link on
+    the cited page (or same site if no [S#] is cited). Returns (text, swaps)."""
     out, swaps = [], []
     for line in text.splitlines():
         for u in URL_RE.findall(line):
             if PRODUCT_HREF.search(u) and not SKIP_HREF.search(u):
                 continue
-            words = _tokens(line.replace(u, ""))
-            best, score = None, 1
-            for label, pu in plinks:
-                if _domain(pu) != _domain(u):
-                    continue
-                sc = len(words & _tokens(label))
-                if sc > score:
-                    best, score = pu, sc
-            if best:
+            cited = [int(n) for n in re.findall(r"\[S(\d+)\]", line)]
+            pool = [l for n in cited for l in links_by_source.get(n, [])] or [
+                l for ls in links_by_source.values() for l in ls if _domain(l[1]) == _domain(u)]
+            pool = [l for l in pool if _domain(l[1]) == _domain(u)]
+            if not pool:
+                continue
+            freq = {}
+            for label, _ in pool:
+                for t in _tokens(label) - GENERIC:
+                    freq[t] = freq.get(t, 0) + 1
+            words = (_tokens(line.replace(u, "")) - GENERIC)
+            distinctive = {w for w in words if len(w) >= 4 and freq.get(w) == 1}
+            # Model codes (letters+digits, e.g. LS01) must not conflict.
+            model = lambda ts: {t for t in ts if re.search(r"\d", t) and re.search(r"[^\W\d_]", t)}
+            mine = model(words)
+            matches = [(label, pu) for label, pu in pool
+                       if distinctive & _tokens(label)
+                       and not (mine and model(_tokens(label)) and not mine & model(_tokens(label)))]
+            if len({pu for _, pu in matches}) == 1:
+                best = matches[0][1]
                 line = line.replace(u, best)
-                swaps.append([u, best])
+                swaps.append([u, best, matches[0][0]])
         out.append(line)
     return "\n".join(out), swaps
 
@@ -67,7 +89,7 @@ def fetch_page(url, timeout=20):
             if full not in [u for _, u in links]:
                 links.append((label[:90], full))
     text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))
-    return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS], links[:12]
+    return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS], links
 
 
 PRICE_RE = re.compile(r"(?:C?\$|CAD\s?)\s?\d[\d,]*(?:\.\d{2})?")
@@ -185,12 +207,18 @@ def search_sources(context, task, per_query=4, max_pages=5):
         except Exception as e:
             errors.append(f"search failed for {q!r}: {e}")
     blocks = []
+    LAST_LINKS.clear()
     skip = re.compile(r"(gstatic\.com|googleusercontent|\.(jpe?g|png|gif|webp|svg|pdf)(\?|$))", re.I)
     hits = [h for h in hits if not skip.search(h["url"])]
     for i, h in enumerate(hits[:max_pages], 1):
         try:
             text, links = fetch_page(h["url"])
             body = price_focus(text)
+            LAST_LINKS[i] = links
+            # Show the model only links for products visible in the trimmed
+            # text; the full list stays in code for link resolution.
+            shown = [l for l in links if (_tokens(l[0]) - GENERIC) & _tokens(body)][:12]
+            links = shown
             if links:
                 body += "\nPRODUCT LINKS ON THIS PAGE:\n" + "\n".join(
                     f"- {label} -> {u}" for label, u in links)

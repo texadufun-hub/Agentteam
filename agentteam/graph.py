@@ -151,7 +151,7 @@ class Team:
         """Code step: swap category-page links for the matching product link."""
         if name not in self.cfg.get("resolve_product_links", []) or not self._search:
             return work
-        new, swaps = tools.resolve_product_links(work, self._search)
+        new, swaps = tools.resolve_product_links(work, self._links)
         if swaps:
             log.write("tool", node="product_links", swaps=swaps,
                       summary=f"{len(swaps)} links pointed to product pages")
@@ -164,6 +164,7 @@ class Team:
             # tool see it, which keeps later prompts short for a local model.
             out = tools.search_sources(context, task)
             self._search = out
+            self._links = dict(tools.LAST_LINKS)
             log.write("tool", node="search", output=out,
                       summary=f"{out.count('[S')} pages")
             return "" if "[S1]" in out else out
@@ -196,6 +197,7 @@ class Team:
         self._sources = None
         self._linked = None
         self._search = None
+        self._links = {}
         if any("fetch_urls" in a.tools for a in self.agents.values()):
             self._sources = tools.fetch_urls(task)
             log.write("tool", node="fetch_urls", output=self._sources,

@@ -50,7 +50,7 @@
       "name": "Verifier",
       "job": "Turn the search SOURCES into a verified list of real offers.",
       "input": "The brief and SOURCES.",
-      "output": "One line per offer: product, merchant, URL, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. URL must be copied exactly from PRODUCT LINKS or the page URL in SOURCES; if no product link exists use the page URL. List every matching product with a price, not just one. Drop items that are not the product asked for.",
+      "output": "One line per offer: product, merchant, URL, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. URL: copy the matching PRODUCT LINKS entry if the same product is listed there, otherwise the page URL. Always include the [S#] of the page. List every matching product with a price, not just one. Drop items that are not the product asked for.",
       "done_well": [
         "Every offer cites a source and its URL is copied exactly",
         "Total cost includes shipping when shown",
@@ -70,11 +70,11 @@
       "name": "Risk",
       "job": "Flag merchants or offers that a consumer should be careful with.",
       "input": "The brief and SOURCES.",
-      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch).",
+      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources.",
       "done_well": [
-        "Each risk quotes the triggering text",
+        "Each stated risk quotes the triggering text from SOURCES",
         "Every merchant in SOURCES gets a rating",
-        "Says plainly when no risk was found",
+        "Merchants with no evidence get the exact no-evidence line instead of invented reasons",
         "No generic filler"
       ],
       "never": [

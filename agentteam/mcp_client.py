@@ -41,8 +41,9 @@ class MCP:
             raise RuntimeError(f"MCP {method} failed: {res and res.get('error')}")
         return res["result"]
 
-    def tools(self):
-        return [t["name"] for t in self._rpc("tools/list", {})["tools"]]
+    def tools(self, full=False):
+        ts = self._rpc("tools/list", {})["tools"]
+        return ts if full else [t["name"] for t in ts]
 
     def call(self, name, args):
         res = self._rpc("tools/call", {"name": name, "arguments": args})

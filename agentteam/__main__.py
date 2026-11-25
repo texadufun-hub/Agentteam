@@ -17,13 +17,29 @@ def main():
     sub.add_parser("smoke")
     t = sub.add_parser("mcp-tools", help="list tools on an MCP server URL")
     t.add_argument("url")
+    t.add_argument("--schema", action="store_true", help="show input schemas")
+    c = sub.add_parser("mcp-call", help="call one MCP tool and print its text")
+    c.add_argument("url")
+    c.add_argument("tool")
+    c.add_argument("args", help='JSON arguments, e.g. {"url": "https://..."}')
     i = sub.add_parser("improve")
     i.add_argument("--team", default="deal_finder")
     i.add_argument("--apply", action="store_true")
     a = p.parse_args()
     if a.cmd == "mcp-tools":
         from .mcp_client import MCP
-        print("\n".join(MCP(a.url).tools()))
+        import json
+        if a.schema:
+            for t in MCP(a.url).tools(full=True):
+                print(f"## {t['name']}\n{t.get('description','')}\n"
+                      + json.dumps(t.get("inputSchema", {}), indent=1) + "\n")
+        else:
+            print("\n".join(MCP(a.url).tools()))
+        return
+    if a.cmd == "mcp-call":
+        import json
+        from .mcp_client import MCP
+        print(MCP(a.url, timeout=300).call(a.tool, json.loads(a.args)))
         return
     if a.cmd == "smoke":
         sys.exit(0 if smoke.run() else 1)

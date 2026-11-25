@@ -82,6 +82,11 @@ def fetch_page(url, timeout=20):
         if not (ctype.startswith("text/") or "html" in ctype or "json" in ctype):
             raise ValueError(f"not a web page ({ctype})")
         raw = r.read(8_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
+    return parse_html(raw, url)
+
+
+def parse_html(raw, url):
+    """(text, product_links) from raw HTML; url resolves relative links."""
     raw = re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", raw)
     links = []
     for attrs, inner in re.findall(r'(?is)<a\b([^>]*)>(.*?)</a>', raw):
@@ -240,6 +245,21 @@ def search_sources(context, task, per_query=4, max_pages=5):
             body = f"FETCH FAILED: {e}"
         snip = f"Search snippet: {h['snippet']}\n" if h.get("snippet") else ""
         blocks.append(f"[S{i}] {h['title']}\n{h['url']}\n{snip}{body}")
+    from . import stores
+    for name in [x.strip() for x in os.environ.get("AGENTTEAM_STORES", "").split(",") if x.strip()]:
+        i = len(blocks) + 1
+        try:
+            page_url, raw = stores.search(name, queries[0].strip())
+            text, links = parse_html(raw, page_url)
+            body = price_focus(text)
+            LAST_LINKS[i] = links
+            shown = [l for l in links if PRICE_RE.search(l[0]) or (_tokens(l[0]) - GENERIC) & _tokens(body)][:12]
+            if shown:
+                body += "\nPRODUCT LINKS ON THIS PAGE:\n" + "\n".join(
+                    f"- {label} -> {u}" for label, u in shown)
+        except Exception as e:
+            page_url, body = f"store:{name}", f"FETCH FAILED: {e}"
+        blocks.append(f"[S{i}] {name} search\n{page_url}\n{body}")
     head = "SOURCES (from search):\n" + ("\n".join(errors) + "\n" if errors else "")
     return head + ("\n\n".join(blocks) if blocks else "(no results)")
 

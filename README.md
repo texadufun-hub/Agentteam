@@ -26,6 +26,9 @@ Plain Python 3.10+, standard library only. Nothing to install.
    # export AGENTTEAM_SEARX_URL=http://HOST:PORT
    ```
    `python -m agentteam mcp-tools $AGENTTEAM_SEARCH_MCP_URL` lists its tools.
+
+   Extra stores read through ufetch's headless browser:
+   `export AGENTTEAM_STORES=newegg` (see `agentteam/stores.py`).
 2. Check the model: `python -m agentteam smoke`
 3. Run: `python -m agentteam run "best laptop stand under $60"`
 

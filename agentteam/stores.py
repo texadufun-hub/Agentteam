@@ -3,6 +3,7 @@
 
 newegg, staples: run ufetch's newegg_ca / staples_ca search in its headless browser, then reads
 the page copy ufetch saves (its own Newegg card parser is out of date).
+walmart: plain HTTP search page; listings from its embedded __NEXT_DATA__ JSON.
 Settings: AGENTTEAM_UFETCH_MCP_URL, AGENTTEAM_UFETCH_CACHE.
 """
 import os
@@ -67,7 +68,58 @@ def staples(query):
     return url, _ufetch_search("staples_ca", query)
 
 
-READERS = {"newegg": newegg, "staples": staples}
+def _walk_products(node, base, out):
+    """Find product-like dicts (a name, a price, a URL or id) anywhere in a
+    page's embedded JSON."""
+    if isinstance(node, dict):
+        name = node.get("name") or node.get("title")
+        url = node.get("canonicalUrl") or node.get("productUrl") or node.get("url")
+        price = node.get("price") or node.get("priceInfo") or node.get("currentPrice")
+        if isinstance(price, dict):
+            price = (price.get("currentPrice") or price.get("linePrice") or price.get("price")
+                     or price.get("priceString") or price.get("displayPrice"))
+            if isinstance(price, dict):
+                price = price.get("priceString") or price.get("price")
+        if isinstance(name, str) and isinstance(url, str) and price not in (None, "", {}):
+            p = str(price)
+            out.append((f"{name} {p if '$' in p else '$' + p}", urllib.parse.urljoin(base, url)))
+        for v in node.values():
+            _walk_products(v, base, out)
+    elif isinstance(node, list):
+        for v in node:
+            _walk_products(v, base, out)
+
+
+def _plain_with_json(url, product_path):
+    """Plain HTTP fetch; listings come from the embedded __NEXT_DATA__ JSON
+    when the HTML itself carries only a few of them."""
+    import html, json, re, urllib.request
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept-Language": "en-CA,en;q=0.9"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        raw = r.read(8_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
+    items = []
+    m = re.search(r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', raw, re.S)
+    if m:
+        try:
+            _walk_products(json.loads(m.group(1)), url, items)
+        except ValueError:
+            pass
+    seen, rows = set(), []
+    for t, u in items:
+        if product_path in u and u not in seen:
+            seen.add(u)
+            rows.append(f'<a href="{html.escape(u)}">{html.escape(t)}</a> {html.escape(t)}')
+    return "\n".join(rows) if rows else raw
+
+
+def walmart(query):
+    url = "https://www.walmart.ca/en/search?" + urllib.parse.urlencode({"q": query})
+    return url, _plain_with_json(url, "/ip/")
+
+
+READERS = {"newegg": newegg, "staples": staples, "walmart": walmart}
 
 
 def search(name, query):

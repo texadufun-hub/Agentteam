@@ -61,11 +61,17 @@ def resolve_product_links(text, links_by_source):
             words = (_tokens(line.replace(u, "")) - GENERIC)
             distinctive = {w for w in words if len(w) >= 4 and freq.get(w) == 1}
             # Model codes (letters+digits, e.g. LS01) must not conflict.
-            model = lambda ts: {t for t in ts if re.search(r"\d", t) and re.search(r"[^\W\d_]", t)}
+            # Sizes and units (64gb, 2x32gb, 17in) are not model codes, and
+            # the link's URL slug counts too (it often names the model).
+            unit = re.compile(r"^(\d+x)?\d+(gb|tb|mb|mhz|ghz|hz|mm|cm|in|inch|lb|lbs|kg|w|v|mah|pcs|pack|pc)$")
+            model = lambda ts: {t for t in ts if re.search(r"\d", t) and re.search(r"[^\W\d_]", t)
+                                and not unit.match(t)}
             mine = model(words)
+            def conflicts(label, pu):
+                theirs = model(_tokens(label) | _tokens(urllib.parse.urlparse(pu).path))
+                return bool(mine and theirs and not mine & theirs)
             matches = [(label, pu) for label, pu in pool
-                       if distinctive & _tokens(label)
-                       and not (mine and model(_tokens(label)) and not mine & model(_tokens(label)))]
+                       if distinctive & _tokens(label) and not conflicts(label, pu)]
             if matches and len({pkey(pu) for _, pu in matches}) == 1:
                 best = matches[0][1]
                 line = line.replace(u, best)

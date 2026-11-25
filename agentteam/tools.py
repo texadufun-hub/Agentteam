@@ -340,7 +340,11 @@ def price_seen(price, line, url, evidence, labels=None, before=160, after=15):
     return False
 
 
-def price_order(offers_text, tie=5.0, blocked=(), evidence=None, labels_by_url=None, dropped=None):
+MARKETPLACE = re.compile(r"marketplace|third[- ]party seller", re.I)
+
+
+def price_order(offers_text, tie=5.0, blocked=(), evidence=None, labels_by_url=None, dropped=None,
+                marketplace_margin=0.0):
     """Sort offer lines cheapest first: total cost when shipping is known,
     item price when it is not. Within `tie` dollars, confirmed shipping goes
     first. Lines without a price, or that can't be shipped (marked in the
@@ -369,6 +373,19 @@ def price_order(offers_text, tie=5.0, blocked=(), evidence=None, labels_by_url=N
         if urls[0] not in {r[2] for r in rows}:
             rows.append((basis, confirmed, urls[0], line.strip()))
     rows.sort(key=lambda r: r[0])
+    if marketplace_margin:
+        # A store-sold offer beats a marketplace-seller one unless the
+        # marketplace offer is more than `marketplace_margin` dollars cheaper.
+        mkt = lambda r: bool(MARKETPLACE.search(r[3]))
+        for _ in range(len(rows)):
+            moved = False
+            for i in range(len(rows) - 1):
+                a, b = rows[i], rows[i + 1]
+                if mkt(a) and not mkt(b) and b[0] - a[0] <= marketplace_margin:
+                    rows[i], rows[i + 1] = b, a
+                    moved = True
+            if not moved:
+                break
     for _ in range(len(rows)):
         changed = False
         for i in range(len(rows) - 1):

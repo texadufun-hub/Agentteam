@@ -142,5 +142,6 @@
   ],
   "must_follow_order": [
     "Ranker"
-  ]
+  ],
+  "marketplace_margin": 15
 }

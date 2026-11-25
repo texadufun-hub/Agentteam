@@ -219,7 +219,8 @@ class Team:
                     labels.setdefault(u.lower(), []).append(label)
             dropped = []
             rows = tools.price_order(offers, blocked=blocked, evidence=self._search or "",
-                                     labels_by_url=labels, dropped=dropped)
+                                     labels_by_url=labels, dropped=dropped,
+                                     marketplace_margin=float(self.cfg.get("marketplace_margin", 0)))
             if dropped:
                 log.write("check", node="PriceGuard", round=0, score=f"{len(dropped)} dropped",
                           ok=False, fixes=dropped, summary=f"{len(dropped)} prices not in sources")
@@ -229,7 +230,8 @@ class Team:
             log.write("tool", node="order", output="\n".join(lines),
                       summary=f"{len(rows)} offers ordered")
             return ("\n\n### PRICE ORDER (computed by code: cheapest first; within $5 confirmed "
-                    "shipping first). Keep this order. Skip an offer only for a stated reason "
+                    "shipping first; store-sold before marketplace sellers unless they are more than "
+                    f"${self.cfg.get('marketplace_margin', 0)} cheaper). Keep this order. Skip an offer only for a stated reason "
                     "(wrong variant, high risk, delivery unavailable).\n" + "\n".join(lines))
         if name == "@link":
             # Runs only after ranking, so ranking never sees affiliate status.

@@ -67,6 +67,7 @@ class Team:
         (self.root / "memory").mkdir(exist_ok=True)
         self.memory_path = self.root / "memory" / f"{name}.md"
         self._sources = None
+        self._order = []
 
     # ---- Lead ---------------------------------------------------------
     def route(self, task):
@@ -127,8 +128,24 @@ class Team:
             dropped = []
             if name in self.cfg.get("must_keep_links", []) and self._linked:
                 have = {u.lower() for u in tools.URL_RE.findall(work)}
-                dropped = [u for u in tools.URL_RE.findall(self._linked) if u.lower() not in have]
-            if dropped and not invented:
+                picks = list(dict.fromkeys(tools.URL_RE.findall(self._linked)))[:3]
+                dropped = [u for u in picks if u.lower() not in have]
+            # Order keeper: picks must follow the code-computed PRICE ORDER.
+            misordered = []
+            if name in self.cfg.get("must_follow_order", []) and self._order:
+                pos = {u.lower(): i for i, u in enumerate(self._order)}
+                picks = [u for u in dict.fromkeys(tools.URL_RE.findall(work)) if u.lower() in pos]
+                for a, b in zip(picks, picks[1:]):
+                    if pos[b.lower()] < pos[a.lower()]:
+                        misordered.append(f"Put {b} before {a}: PRICE ORDER has it cheaper. Keep PRICE ORDER.")
+                if len(picks) > 3:
+                    misordered.append("List only your top 3 offers.")
+            if misordered and not invented:
+                ok, score, detail = False, "0/1 order", []
+                fixes = misordered[:5]
+                log.write("check", node=name, round=rnd, score=score, ok=False,
+                          fixes=fixes, detail="order keeper", summary="order broken")
+            elif dropped and not invented:
                 ok, score, detail = False, "0/1 links", []
                 fixes = [f"Add this link to the pick it belongs to, copied exactly: {u}" for u in dropped[:5]]
                 log.write("check", node=name, round=rnd, score=score, ok=False,
@@ -182,6 +199,18 @@ class Team:
             log.write("tool", node="search", output=out,
                       summary=f"{out.count('[S')} pages")
             return "" if "[S1]" in out else out
+        if name == "@order":
+            src = self.cfg.get("order_from", "Verifier")
+            offers = next((r["output"] for r in reversed(results) if r["node"] == src), "")
+            rows = tools.price_order(offers)
+            self._order = [r[2] for r in rows]
+            lines = [f"{i}. ${b:.2f} {'confirmed total' if c else 'item price, shipping unknown'} | {ln}"
+                     for i, (b, c, u, ln) in enumerate(rows, 1)]
+            log.write("tool", node="order", output="\n".join(lines),
+                      summary=f"{len(rows)} offers ordered")
+            return ("\n\n### PRICE ORDER (computed by code: cheapest first; within $5 confirmed "
+                    "shipping first). Keep this order. Skip an offer only for a stated reason "
+                    "(wrong variant, high risk, delivery unavailable).\n" + "\n".join(lines))
         if name == "@link":
             # Runs only after ranking, so ranking never sees affiliate status.
             ranked = next(r["output"] for r in reversed(results)
@@ -212,6 +241,7 @@ class Team:
         self._linked = None
         self._search = None
         self._links = {}
+        self._order = []
         if any("fetch_urls" in a.tools for a in self.agents.values()):
             self._sources = tools.fetch_urls(task)
             log.write("tool", node="fetch_urls", output=self._sources,

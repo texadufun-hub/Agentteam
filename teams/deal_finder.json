@@ -11,6 +11,7 @@
       "Verifier",
       "Risk"
     ],
+    "@order",
     [
       "Ranker"
     ],
@@ -36,7 +37,7 @@
         "2 to 4 QUERY: lines",
         "Queries name the product type plus price/buy and country; brand or model names appear only if the consumer gave them",
         "Nothing invented: every must-have and nice-to-have was stated by the consumer",
-        "VARIANT names the incompatible kinds when the product has them"
+        "VARIANT is UNKNOWN, a kind the consumer named, or a short list of incompatible kinds (any wording)"
       ],
       "never": [
         "Recommend a product",
@@ -52,7 +53,7 @@
       "name": "Verifier",
       "job": "Turn the search SOURCES into a verified list of real offers.",
       "input": "The brief and SOURCES.",
-      "output": "One line per offer: product, merchant, URL, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. URL: copy the matching PRODUCT LINKS entry if the same product is listed there, otherwise the page URL. Always include the [S#] of the page. List every matching product with a price, not just one. Drop items that are not the product asked for. Write DELIVERY UNAVAILABLE only if the text right next to that item says delivery or shipping is unavailable (not image or stock notices). List each product once. At most 8 offers, cheapest first. Tag each offer with its VARIANT from the title or part number (e.g. SO-DIMM, UDIMM, RDIMM), or VARIANT UNKNOWN. Stock and return policy: give them only when the text right next to that item states them; otherwise write UNKNOWN. Page-wide filter, sort or menu text (e.g. 'in 30 Days', 'In Stock' filters) is not about any item. If a listing says 'from price, varies by option' or is sold by a third-party/marketplace seller, say so in that offer's line.",
+      "output": "One line per offer, using these labels: product, merchant, URL, price $X, shipping FREE or $Y or UNKNOWN, total cost, in stock yes/no/unknown, return window, source [S#]. URL: copy the matching PRODUCT LINKS entry if the same product is listed there, otherwise the page URL. Always include the [S#] of the page. List every matching product with a price, not just one. Drop items that are not the product asked for. Write DELIVERY UNAVAILABLE only if the text right next to that item says delivery or shipping is unavailable (not image or stock notices). List each product once. At most 8 offers, cheapest first. Tag each offer with its VARIANT from the title or part number (e.g. SO-DIMM, UDIMM, RDIMM), or VARIANT UNKNOWN. Stock and return policy: give them only when the text right next to that item states them; otherwise write UNKNOWN. Page-wide filter, sort or menu text (e.g. 'in 30 Days', 'In Stock' filters) is not about any item. If a listing says 'from price, varies by option' or is sold by a third-party/marketplace seller, say so in that offer's line.",
       "done_well": [
         "Every offer cites a source and its URL is copied exactly",
         "Total cost includes shipping when shown",
@@ -95,13 +96,13 @@
     },
     {
       "name": "Ranker",
-      "job": "Rank the offers on value to the consumer only: cheapest first, using total cost (item + shipping) where shipping is known and item price where it is UNKNOWN. Mark unknown shipping as unconfirmed; do not disqualify for that alone. If two offers are within $5 of each other, prefer the one with confirmed shipping.",
-      "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
-      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then confirmed domestic delivery over overseas shipping, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason. State the deciding tie-breaker once, and do not contradict it. If the brief's VARIANT is known, rank only offers of that variant. If it is UNKNOWN and offers differ in variant, never mix them: rank the top 3 of the most common consumer variant, say which, and name the best offer of each other variant in one line.",
+      "job": "Pick the top 3 offers on value to the consumer only. The order is already computed by code in PRICE ORDER: take the first 3 offers there, skipping one only for a stated reason (wrong variant, high risk, delivery unavailable). Do no price arithmetic yourself.",
+      "input": "Brief, Verifier offers, Risk ratings, PRICE ORDER. You do not know and must not consider which merchants pay commission.",
+      "output": "Exactly 3 offers in PRICE ORDER, each with the URL exactly as given, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Name any offer you skipped and why. Then GOOD DEAL: yes/no for #1 with one reason.",
       "done_well": [
-        "Ranking follows price, must-haves and risk, and any tie is broken by a stated rule",
+        "Exactly 3 picks, in PRICE ORDER, with any skipped offer explained",
         "URLs copied exactly from Verifier",
-        "Order follows the cheapest-first rule; within $5, confirmed shipping wins; high-risk offers are not ranked #1 unless the reason is stated",
+        "Unknown shipping is marked unconfirmed",
         "GOOD DEAL verdict is given and justified"
       ],
       "never": [
@@ -137,5 +138,8 @@
   ],
   "must_keep_links": [
     "Writer"
+  ],
+  "must_follow_order": [
+    "Ranker"
   ]
 }

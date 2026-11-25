@@ -310,6 +310,46 @@ def search_sources(context, task, per_query=4, max_pages=5):
     return head + ("\n\n".join(blocks) if blocks else "(no results)")
 
 
+# ---- price order (code, so ranking arithmetic is never left to the model) --
+_PRICE = re.compile(r"\bprice\s*:?\s*(?:CAD\s*)?\$\s*([\d,]+(?:\.\d+)?)", re.I)
+_SHIP = re.compile(r"\bshipping\s*:?\s*(free|unknown|(?:CAD\s*)?\$\s*[\d,]+(?:\.\d+)?)", re.I)
+
+
+def price_order(offers_text, tie=5.0):
+    """Sort offer lines cheapest first: total cost when shipping is known,
+    item price when it is not. Within `tie` dollars, confirmed shipping goes
+    first. Lines marked DELIVERY UNAVAILABLE or without a price are left out.
+    Returns [(basis, confirmed, url, line)]."""
+    rows = []
+    for line in offers_text.splitlines():
+        urls = URL_RE.findall(line)
+        m = _PRICE.search(line)
+        if not urls or not m or "DELIVERY UNAVAILABLE" in line.upper():
+            continue
+        price = float(m.group(1).replace(",", ""))
+        sh = _SHIP.search(line)
+        ship = sh.group(1).lower() if sh else "unknown"
+        if ship == "free":
+            basis, confirmed = price, True
+        elif "$" in ship:
+            basis, confirmed = price + float(re.sub(r"[^\d.]", "", ship) or 0), True
+        else:
+            basis, confirmed = price, False
+        if urls[0] not in {r[2] for r in rows}:
+            rows.append((basis, confirmed, urls[0], line.strip()))
+    rows.sort(key=lambda r: r[0])
+    for _ in range(len(rows)):
+        changed = False
+        for i in range(len(rows) - 1):
+            a, b = rows[i], rows[i + 1]
+            if not a[1] and b[1] and b[0] - a[0] <= tie:
+                rows[i], rows[i + 1] = b, a
+                changed = True
+        if not changed:
+            break
+    return rows
+
+
 # ---- affiliate linker (code, runs AFTER ranking) -------------------------
 def _domain(url):
     host = urllib.parse.urlparse(url).netloc.lower()

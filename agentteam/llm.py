@@ -64,6 +64,9 @@ def _chat_once(system, user, model, temperature, timeout):
     body = {
         "model": mdl,
         "temperature": temperature,
+        # Cap output so one runaway generation can't hold the server for
+        # half an hour. Raise with AGENTTEAM_MAX_TOKENS if replies get cut.
+        "max_tokens": int(os.environ.get("AGENTTEAM_MAX_TOKENS", "2000")),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},

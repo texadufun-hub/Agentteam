@@ -1,7 +1,7 @@
 """Store readers for sites plain HTTP can't read. Each returns
 (page_url, raw_html) for a search query.
 
-newegg, staples: run ufetch's newegg_ca / staples_ca search in its headless browser, then reads
+newegg, staples, costco: run ufetch's newegg_ca / staples_ca / costco_ca search in its headless browser, then reads
 the page copy ufetch saves (its own Newegg card parser is out of date).
 walmart: plain HTTP search page; listings from its embedded __NEXT_DATA__ JSON.
 Settings: AGENTTEAM_UFETCH_MCP_URL, AGENTTEAM_UFETCH_CACHE.
@@ -66,6 +66,11 @@ def newegg(query):
 def staples(query):
     url = "https://www.staples.ca/search?" + urllib.parse.urlencode({"query": query})
     return url, _ufetch_search("staples_ca", query)
+
+
+def costco(query):
+    url = "https://www.costco.ca/s?" + urllib.parse.urlencode({"keyword": query})
+    return url, _ufetch_search("costco_ca", query)
 
 
 def _walk_products(node, base, out):
@@ -143,7 +148,7 @@ def walmart(query):
     return url, _cached("walmart", query, lambda: _plain_with_json(url, "/ip/"))
 
 
-READERS = {"newegg": newegg, "staples": staples, "walmart": walmart}
+READERS = {"newegg": newegg, "staples": staples, "walmart": walmart, "costco": costco}
 
 
 def search(name, query):

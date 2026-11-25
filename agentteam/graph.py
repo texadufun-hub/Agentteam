@@ -169,7 +169,17 @@ class Team:
         context, results = "", []
         for stage in stages:
             if isinstance(stage, str) and stage.startswith("@"):
-                context += self.run_tool(stage, task, context, results, log)
+                out = self.run_tool(stage, task, context, results, log)
+                context += out
+                if stage == "@search" and "[S1]" not in out:
+                    # Nothing to verify: stop instead of making agents argue
+                    # with the Checker over offers that don't exist.
+                    log.write("route", node="Lead", rule="no-results",
+                              summary="search empty, stopping early")
+                    results.append({"node": "Lead", "ok": False, "score": "0/0",
+                                    "output": "No offers found: search returned no results.",
+                                    "still_wrong": ["search returned no results; check the search setting"]})
+                    break
                 continue
             # fan-out: independent agents in a stage run in parallel
             with ThreadPoolExecutor(max_workers=len(stage)) as ex:
@@ -196,7 +206,7 @@ class Team:
                                 [f"link not from LINKED OFFERS: {u}" for u in bad]})
                 log.write("check", node="LinkGuard", round=0, score="0/1",
                           ok=False, fixes=bad, summary=f"{len(bad)} bad links")
-        if self.cfg.get("disclosure"):
+        if self.cfg.get("disclosure") and tools.URL_RE.search(final):
             final += "\n\n" + self.cfg["disclosure"]
         log.write("final", node="Lead", flagged=[f["node"] for f in flagged],
                   summary="ready for approval")

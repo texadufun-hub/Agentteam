@@ -97,8 +97,18 @@ def _plain_with_json(url, product_path):
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
         "Accept-Language": "en-CA,en;q=0.9"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        raw = r.read(8_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
+    import urllib.error
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                raw = r.read(8_000_000).decode(r.headers.get_content_charset() or "utf-8", "replace")
+            break
+        except urllib.error.HTTPError as e:
+            # Throttled: wait as asked (capped at 60s) and try once more.
+            if e.code != 429 or attempt:
+                raise
+            wait = e.headers.get("Retry-After", "")
+            time.sleep(min(int(wait) if wait.isdigit() else 30, 60))
     items = []
     m = re.search(r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', raw, re.S)
     if m:
@@ -114,9 +124,23 @@ def _plain_with_json(url, product_path):
     return "\n".join(rows) if rows else raw
 
 
+def _cached(name, query, fetch):
+    """Keep a store page for 15 minutes so repeat runs don't re-hit (and
+    get throttled by) the site."""
+    import hashlib
+    d = Path(os.environ.get("AGENTTEAM_STORE_CACHE", "~/.cache/agentteam_stores")).expanduser()
+    f = d / f"{name}-{hashlib.sha1(query.lower().encode()).hexdigest()[:12]}.html"
+    if f.exists() and time.time() - f.stat().st_mtime <= 900:
+        return f.read_text(errors="replace")
+    raw = fetch()
+    d.mkdir(parents=True, exist_ok=True)
+    f.write_text(raw)
+    return raw
+
+
 def walmart(query):
     url = "https://www.walmart.ca/en/search?" + urllib.parse.urlencode({"q": query})
-    return url, _plain_with_json(url, "/ip/")
+    return url, _cached("walmart", query, lambda: _plain_with_json(url, "/ip/"))
 
 
 READERS = {"newegg": newegg, "staples": staples, "walmart": walmart}

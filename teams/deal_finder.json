@@ -72,7 +72,7 @@
       "name": "Risk",
       "job": "Flag merchants or offers that a consumer should be careful with.",
       "input": "The brief and SOURCES.",
-      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, online-only/not sold in stores, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources.",
+      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources.",
       "done_well": [
         "Each stated risk quotes the triggering text from SOURCES",
         "Every merchant in SOURCES gets a rating",
@@ -80,23 +80,23 @@
         "No generic filler"
       ],
       "never": [
-        "Invent reviews or reputation facts not in SOURCES"
+        "Invent reviews or reputation facts not in SOURCES",
+        "Treat an image or photo 'unavailable' notice, or online-only / not sold in stores, as a risk"
       ],
       "hands_to": "Ranker",
       "tools": [
         "sources"
-      ],
-      "think": false
+      ]
     },
     {
       "name": "Ranker",
-      "job": "Rank the offers on value to the consumer only. If shipping is UNKNOWN, rank on item price and mark shipping as unconfirmed; do not disqualify for that alone.",
+      "job": "Rank the offers on value to the consumer only, by total cost (item + shipping) where it is known. Unknown shipping is a cost risk, not a disqualifier: an offer with unknown shipping ranks above one with a confirmed total only if its item price is more than 15% lower, and you must say so.",
       "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
       "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason.",
       "done_well": [
         "Ranking follows price, must-haves and risk, and any tie is broken by a stated rule",
         "URLs copied exactly from Verifier",
-        "High-risk offers are not ranked #1 unless the reason is stated; unknown shipping is flagged, not disqualifying",
+        "High-risk offers are not ranked #1 unless the reason is stated; a confirmed total beats an unknown-shipping offer within 15% of it",
         "GOOD DEAL verdict is given and justified"
       ],
       "never": [

@@ -15,6 +15,22 @@ class LLMError(RuntimeError):
     pass
 
 
+def _load_dotenv():
+    """Read KEY=VALUE lines from .env in the current folder (git-ignored),
+    so the key never has to be typed into a shell or chat."""
+    p = os.path.join(os.getcwd(), ".env")
+    if not os.path.exists(p):
+        return
+    for line in open(p):
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
+
+
 def _cfg(model=None):
     base = os.environ.get("AGENTTEAM_BASE_URL")
     mdl = model or os.environ.get("AGENTTEAM_MODEL")

@@ -30,12 +30,13 @@
       "name": "Intake",
       "job": "Turn the consumer's request into a precise shopping brief and search queries.",
       "input": "The consumer's request.",
-      "output": "PRODUCT, BUDGET, COUNTRY (default Canada), MUST-HAVES and NICE-TO-HAVES (only what the consumer actually said, otherwise NONE), then 2 to 4 lines starting exactly with QUERY: that would find current offers (include price or buy and the country).",
+      "output": "PRODUCT, BUDGET, COUNTRY (default Canada), VARIANT (the incompatible kinds this product comes in, e.g. desktop DIMM / laptop SO-DIMM / server RDIMM for memory, or the one the consumer named; UNKNOWN if they didn't say), MUST-HAVES and NICE-TO-HAVES (only what the consumer actually said, otherwise NONE), then 2 to 4 lines starting exactly with QUERY: that would find current offers (include price or buy and the country).",
       "done_well": [
-        "Every field present, unknowns marked UNKNOWN",
+        "Every field present, unknowns marked UNKNOWN; COUNTRY defaults to Canada when not stated, which is not an invention",
         "2 to 4 QUERY: lines",
         "Queries name the product type plus price/buy and country; brand or model names appear only if the consumer gave them",
-        "Nothing invented: every must-have and nice-to-have was stated by the consumer"
+        "Nothing invented: every must-have and nice-to-have was stated by the consumer",
+        "VARIANT names the incompatible kinds when the product has them"
       ],
       "never": [
         "Recommend a product",
@@ -51,7 +52,7 @@
       "name": "Verifier",
       "job": "Turn the search SOURCES into a verified list of real offers.",
       "input": "The brief and SOURCES.",
-      "output": "One line per offer: product, merchant, URL, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. URL: copy the matching PRODUCT LINKS entry if the same product is listed there, otherwise the page URL. Always include the [S#] of the page. List every matching product with a price, not just one. Drop items that are not the product asked for. Write DELIVERY UNAVAILABLE only if the text right next to that item says delivery or shipping is unavailable (not image or stock notices). List each product once. At most 8 offers, cheapest first.",
+      "output": "One line per offer: product, merchant, URL, price, shipping, total cost, in stock yes/no/unknown, return window, source [S#]. URL: copy the matching PRODUCT LINKS entry if the same product is listed there, otherwise the page URL. Always include the [S#] of the page. List every matching product with a price, not just one. Drop items that are not the product asked for. Write DELIVERY UNAVAILABLE only if the text right next to that item says delivery or shipping is unavailable (not image or stock notices). List each product once. At most 8 offers, cheapest first. Tag each offer with its VARIANT from the title or part number (e.g. SO-DIMM, UDIMM, RDIMM), or VARIANT UNKNOWN.",
       "done_well": [
         "Every offer cites a source and its URL is copied exactly",
         "Total cost includes shipping when shown",
@@ -95,7 +96,7 @@
       "name": "Ranker",
       "job": "Rank the offers on value to the consumer only, by total cost (item + shipping) where it is known. Unknown shipping is a cost risk, not a disqualifier: an offer with unknown shipping ranks above one with a confirmed total only if its item price is more than 15% lower, and you must say so.",
       "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
-      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then confirmed domestic delivery over overseas shipping, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason. State the deciding tie-breaker once, and do not contradict it.",
+      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then confirmed domestic delivery over overseas shipping, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason. State the deciding tie-breaker once, and do not contradict it. If the brief's VARIANT is known, rank only offers of that variant. If it is UNKNOWN and offers differ in variant, never mix them: rank the top 3 of the most common consumer variant, say which, and name the best offer of each other variant in one line.",
       "done_well": [
         "Ranking follows price, must-haves and risk, and any tie is broken by a stated rule",
         "URLs copied exactly from Verifier",
@@ -114,7 +115,7 @@
       "name": "Writer",
       "job": "Write the reply the consumer will read.",
       "input": "The brief and LINKED OFFERS.",
-      "output": "A short friendly reply: the #1 pick with total cost and why, then #2 and #3 in one line each, each with its link copied exactly from LINKED OFFERS. If GOOD DEAL is no, say waiting may be better.",
+      "output": "A short friendly reply: the #1 pick with total cost and why, then #2 and #3 in one line each, each with its link copied exactly from LINKED OFFERS. If GOOD DEAL is no, say waiting may be better. Say which variant the picks are (e.g. desktop memory) and tell the consumer to check it fits their device when the brief's VARIANT was UNKNOWN.",
       "done_well": [
         "Every link is copied exactly from LINKED OFFERS",
         "States the #1 item price and whether shipping is confirmed",

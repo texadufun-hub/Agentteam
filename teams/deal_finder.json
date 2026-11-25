@@ -65,7 +65,8 @@
       "tools": [
         "sources"
       ],
-      "max_tokens": 5000
+      "max_tokens": 5000,
+      "think": false
     },
     {
       "name": "Risk",

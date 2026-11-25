@@ -18,6 +18,9 @@ import urllib.request
 _SLOTS = threading.BoundedSemaphore(int(os.environ.get("AGENTTEAM_CONCURRENCY", "1") or 1))
 
 
+LAST_USAGE = {}  # finish reason, reasoning vs content size of the last call
+
+
 class LLMError(RuntimeError):
     pass
 
@@ -47,7 +50,7 @@ def _cfg(model=None):
 
 
 def chat(system, user, model=None, temperature=0.2, timeout=None, retries=1,
-         max_tokens=None):
+         max_tokens=None, think=True):
     """Retry once on a refused/reset connection, never on a timeout: a local
     server keeps generating after we give up, so a retry would pile up work."""
     timeout = timeout or int(os.environ.get("AGENTTEAM_TIMEOUT", "900"))
@@ -55,11 +58,11 @@ def chat(system, user, model=None, temperature=0.2, timeout=None, retries=1,
         try:
             cap = max_tokens or int(os.environ.get("AGENTTEAM_MAX_TOKENS", "2000"))
             with _SLOTS:
-                text, cut = _chat_once(system, user, model, temperature, timeout, cap)
+                text, cut = _chat_once(system, user, model, temperature, timeout, cap, think)
             if cut:  # hit the cap: one retry with more room, then trim
                 with _SLOTS:
                     text, cut = _chat_once(system, user, model, temperature,
-                                           timeout, min(cap * 2, 8000))
+                                           timeout, min(cap * 2, 8000), think)
             if cut:
                 # Drop the half-written last line (it may hold a broken URL).
                 text = text.rsplit("\n", 1)[0] + "\n[OUTPUT CUT OFF]"
@@ -69,14 +72,19 @@ def chat(system, user, model=None, temperature=0.2, timeout=None, retries=1,
                 raise
 
 
-def _chat_once(system, user, model, temperature, timeout, max_tokens):
+def _chat_once(system, user, model, temperature, timeout, max_tokens, think=True):
     base, mdl, key = _cfg(model)
+    if not think:
+        # Qwen-style soft switch plus the llama.cpp/vLLM template flag; servers
+        # that don't know either simply ignore them.
+        user = user + "\n\n/no_think"
     body = {
         "model": mdl,
         "temperature": temperature,
         # Cap output so one runaway generation can't hold the server for
         # half an hour. Per agent via "max_tokens" in its team file.
         "max_tokens": max_tokens,
+        **({} if think else {"chat_template_kwargs": {"enable_thinking": False}}),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -95,6 +103,9 @@ def _chat_once(system, user, model, temperature, timeout, max_tokens):
         raise LLMError(f"LLM call failed: {e}") from e
     choice = data["choices"][0]
     text = choice["message"].get("content") or ""
+    LAST_USAGE.update(finish=choice.get("finish_reason"),
+                      reasoning_chars=len(choice["message"].get("reasoning_content") or ""),
+                      content_chars=len(text), usage=data.get("usage"))
     # Strip reasoning blocks some local models emit.
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     return text, choice.get("finish_reason") == "length"

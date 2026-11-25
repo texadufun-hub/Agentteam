@@ -34,12 +34,13 @@
       "done_well": [
         "Every field present, unknowns marked UNKNOWN",
         "2 to 4 QUERY: lines",
-        "Queries are specific enough to find the product, not the category",
+        "Queries name the product type plus price/buy and country; brand or model names appear only if the consumer gave them",
         "Nothing invented: every must-have and nice-to-have was stated by the consumer"
       ],
       "never": [
         "Recommend a product",
-        "Mention affiliates or commissions"
+        "Mention affiliates or commissions",
+        "Add brand or model names the consumer did not give"
       ],
       "ask_me_first": [
         "The request is too vague to name a product type"
@@ -72,7 +73,7 @@
       "name": "Risk",
       "job": "Flag merchants or offers that a consumer should be careful with.",
       "input": "The brief and SOURCES.",
-      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources. Text about one item (such as delivery unavailable for that item) goes on a separate line for that item only and does not change the merchant's rating.",
+      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources. Text about one item (such as delivery unavailable for that item) goes on a separate line for that item only and does not change the merchant's rating. 'Not sold in stores' (online-only) and an image or photo 'unavailable' notice are not risks for any merchant or item.",
       "done_well": [
         "Each stated risk quotes the triggering text from SOURCES",
         "Every merchant in SOURCES gets a rating",
@@ -93,7 +94,7 @@
       "name": "Ranker",
       "job": "Rank the offers on value to the consumer only, by total cost (item + shipping) where it is known. Unknown shipping is a cost risk, not a disqualifier: an offer with unknown shipping ranks above one with a confirmed total only if its item price is more than 15% lower, and you must say so.",
       "input": "Brief, Verifier offers, Risk ratings. You do not know and must not consider which merchants pay commission.",
-      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason.",
+      "output": "Top 3 offers ranked, each with the URL exactly as Verifier gave it, item price, shipping (or unconfirmed), why it ranks there, and the risk rating. Break ties by lower risk, then confirmed domestic delivery over overseas shipping, then must-haves met, then better return policy, and say which tie-breaker decided. Then GOOD DEAL: yes/no for #1 with one reason. State the deciding tie-breaker once, and do not contradict it.",
       "done_well": [
         "Ranking follows price, must-haves and risk, and any tie is broken by a stated rule",
         "URLs copied exactly from Verifier",

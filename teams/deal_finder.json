@@ -72,7 +72,7 @@
       "name": "Risk",
       "job": "Flag merchants or offers that a consumer should be careful with.",
       "input": "The brief and SOURCES.",
-      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources.",
+      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources. Text about one item (such as delivery unavailable for that item) goes on a separate line for that item only and does not change the merchant's rating.",
       "done_well": [
         "Each stated risk quotes the triggering text from SOURCES",
         "Every merchant in SOURCES gets a rating",
@@ -81,7 +81,8 @@
       ],
       "never": [
         "Invent reviews or reputation facts not in SOURCES",
-        "Treat an image or photo 'unavailable' notice, or online-only / not sold in stores, as a risk"
+        "Treat an image or photo 'unavailable' notice, or online-only / not sold in stores, as a risk",
+        "Rate a whole merchant high because of one item's delivery or stock line"
       ],
       "hands_to": "Ranker",
       "tools": [

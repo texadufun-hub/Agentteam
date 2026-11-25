@@ -87,7 +87,11 @@ def _walk_products(node, base, out):
                 price = price.get("priceString") or price.get("price")
         if isinstance(name, str) and isinstance(url, str) and price not in (None, "", {}):
             p = str(price)
-            out.append((f"{name} {p if '$' in p else '$' + p}", urllib.parse.urljoin(base, url)))
+            seller = node.get("sellerName") or node.get("sellerDisplayName")
+            note = f" sold by {seller}" if isinstance(seller, str) and seller else ""
+            if "classType=VARIANT" in url:
+                note += " (from price, varies by option)"
+            out.append((f"{name} {p if '$' in p else '$' + p}{note}", urllib.parse.urljoin(base, url)))
         for v in node.values():
             _walk_products(v, base, out)
     elif isinstance(node, list):

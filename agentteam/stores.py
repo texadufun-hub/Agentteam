@@ -1,7 +1,7 @@
 """Store readers for sites plain HTTP can't read. Each returns
 (page_url, raw_html) for a search query.
 
-newegg: runs ufetch's newegg_ca search in its headless browser, then reads
+newegg, staples: run ufetch's newegg_ca / staples_ca search in its headless browser, then reads
 the page copy ufetch saves (its own Newegg card parser is out of date).
 Settings: AGENTTEAM_UFETCH_MCP_URL, AGENTTEAM_UFETCH_CACHE.
 """
@@ -35,7 +35,12 @@ def newegg(query):
     return url, _ufetch_search("newegg_ca", query)
 
 
-READERS = {"newegg": newegg}
+def staples(query):
+    url = "https://www.staples.ca/search?" + urllib.parse.urlencode({"query": query})
+    return url, _ufetch_search("staples_ca", query)
+
+
+READERS = {"newegg": newegg, "staples": staples}
 
 
 def search(name, query):

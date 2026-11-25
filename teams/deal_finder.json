@@ -60,7 +60,8 @@
       ],
       "never": [
         "Invent a URL, price or merchant",
-        "Rank or recommend"
+        "Rank or recommend",
+        "List items that are not the requested product type (e.g. a bed tray or lap desk for a laptop stand request)"
       ],
       "hands_to": "Ranker",
       "tools": [
@@ -73,11 +74,11 @@
       "name": "Risk",
       "job": "Flag merchants or offers that a consumer should be careful with.",
       "input": "The brief and SOURCES.",
-      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write exactly: low - no merchant-specific risk evidence in sources. Text about one item (such as delivery unavailable for that item) goes on a separate line for that item only and does not change the merchant's rating. 'Not sold in stores' (online-only) and an image or photo 'unavailable' notice are not risks for any merchant or item.",
+      "output": "Per merchant: risk high/med/low and the reason quoted from SOURCES (delivery unavailable or not shipped to the consumer's area, unknown seller, marketplace third-party, refurbished, no returns, price far below others, region mismatch). If SOURCES show nothing specific about a merchant, write: low - no merchant-specific risk evidence in sources (a 'Risk:' prefix is fine). Text about one item (such as delivery unavailable for that item) goes on a separate line for that item only and does not change the merchant's rating. 'Not sold in stores' (online-only) and an image or photo 'unavailable' notice are not risks for any merchant or item.",
       "done_well": [
         "Each stated risk quotes the triggering text from SOURCES",
         "Every merchant in SOURCES gets a rating",
-        "Merchants with no evidence get the exact no-evidence line instead of invented reasons",
+        "Merchants with no evidence are rated low with the no-evidence reason instead of invented reasons",
         "No generic filler"
       ],
       "never": [

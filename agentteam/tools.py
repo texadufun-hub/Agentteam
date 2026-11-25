@@ -257,7 +257,14 @@ def search_sources(context, task, per_query=4, max_pages=5):
     hits = [h for h in hits if not skip.search(h["url"])]
     # Sites we don't scrape (Amazon: use its Product API once approved).
     no_fetch = [d.strip() for d in os.environ.get("AGENTTEAM_NO_FETCH", "amazon.").split(",") if d.strip()]
+    store_names = [x.strip() for x in os.environ.get("AGENTTEAM_STORES", "").split(",") if x.strip()]
     for i, h in enumerate(hits[:max_pages], 1):
+        if any(f"{n}." in _domain(h["url"]) for n in store_names):
+            # The store reader below fetches this site through ufetch, at the
+            # consumer's postal code; a plain fetch would show the site's
+            # default location and contradict it.
+            blocks.append(f"[S{i}] {h['title']}\n{h['url']}\nSKIPPED: this store is covered by its store search below; use that source for offers.")
+            continue
         if any(d in _domain(h["url"]) for d in no_fetch):
             blocks.append(f"[S{i}] {h['title']}\n{h['url']}\nNOT FETCHED: this site is excluded (no scraping); use only for awareness, not as an offer.")
             continue
@@ -277,7 +284,7 @@ def search_sources(context, task, per_query=4, max_pages=5):
         snip = f"Search snippet: {h['snippet']}\n" if h.get("snippet") else ""
         blocks.append(f"[S{i}] {h['title']}\n{h['url']}\n{snip}{body}")
     from . import stores
-    for name in [x.strip() for x in os.environ.get("AGENTTEAM_STORES", "").split(",") if x.strip()]:
+    for name in store_names:
         i = len(blocks) + 1
         try:
             product = re.search(r"(?im)^\W*PRODUCT:\s*(.+)$", context)

@@ -122,7 +122,18 @@ class Team:
         for rnd in range(MAX_FIX_ROUNDS + 1):
             # URL guard (code, not model): every link must come from the input.
             invented = [u for u in tools.URL_RE.findall(work) if u.lower() not in allowed]
-            if invented:
+            # Link keeper: agents listed in "must_keep_links" must carry every
+            # linked offer they were given (so #1 never loses its link).
+            dropped = []
+            if name in self.cfg.get("must_keep_links", []) and self._linked:
+                have = {u.lower() for u in tools.URL_RE.findall(work)}
+                dropped = [u for u in tools.URL_RE.findall(self._linked) if u.lower() not in have]
+            if dropped and not invented:
+                ok, score, detail = False, "0/1 links", []
+                fixes = [f"Add this link to the pick it belongs to, copied exactly: {u}" for u in dropped[:5]]
+                log.write("check", node=name, round=rnd, score=score, ok=False,
+                          fixes=fixes, detail="link keeper", summary="dropped links")
+            elif invented:
                 ok, score, detail = False, "0/1 links", []
                 fixes = [f"Remove this link, it is not in your input; use only links copied from your input, or write NO LINK: {u}"
                          for u in invented[:5]]

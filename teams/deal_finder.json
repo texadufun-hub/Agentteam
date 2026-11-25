@@ -126,5 +126,8 @@
   ],
   "resolve_product_links": [
     "Verifier"
+  ],
+  "must_keep_links": [
+    "Writer"
   ]
 }

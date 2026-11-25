@@ -91,6 +91,9 @@ TRACKING = re.compile(r"^(cmp|listid|trk|utm_\w+|ref|ref_|tag|gclid|fbclid|icid|
 
 def clean_url(u):
     """Drop tracking parameters so agents copy short, stable links."""
+    m = re.match(r"(https?://(?:www\.)?amazon\.[a-z.]+)/(?:[^/]+/)?dp/([A-Z0-9]{10})", u)
+    if m:
+        return f"{m.group(1)}/dp/{m.group(2)}"
     parts = urllib.parse.urlsplit(u)
     q = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
          if not TRACKING.match(k)]
@@ -252,7 +255,12 @@ def search_sources(context, task, per_query=4, max_pages=5):
     LAST_LINKS.clear()
     skip = re.compile(r"(gstatic\.com|googleusercontent|\.(jpe?g|png|gif|webp|svg|pdf)(\?|$))", re.I)
     hits = [h for h in hits if not skip.search(h["url"])]
+    # Sites we don't scrape (Amazon: use its Product API once approved).
+    no_fetch = [d.strip() for d in os.environ.get("AGENTTEAM_NO_FETCH", "amazon.").split(",") if d.strip()]
     for i, h in enumerate(hits[:max_pages], 1):
+        if any(d in _domain(h["url"]) for d in no_fetch):
+            blocks.append(f"[S{i}] {h['title']}\n{h['url']}\nNOT FETCHED: this site is excluded (no scraping); use only for awareness, not as an offer.")
+            continue
         try:
             text, links = fetch_page(h["url"])
             body = price_focus(text)

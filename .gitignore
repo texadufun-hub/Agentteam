@@ -4,3 +4,5 @@ workspace/
 proposal-*.json
 __pycache__/
 .env
+affiliates.json
+join_queue.md

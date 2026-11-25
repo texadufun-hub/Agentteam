@@ -1,0 +1,4 @@
+{
+  "amazon.ca": {"param": "tag", "value": "YOURTAG-20"},
+  "example-store.com": {"template": "https://tracker.example/click?id=YOURID&url={url_enc}"}
+}

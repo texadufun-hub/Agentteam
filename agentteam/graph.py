@@ -133,10 +133,32 @@ class Team:
         return {"node": name, "output": work, "score": score, "ok": False,
                 "still_wrong": fixes}
 
+    # ---- code tool nodes (deterministic, no LLM) ----------------------
+    def run_tool(self, name, task, context, results, log):
+        if name == "@search":
+            out = tools.search_sources(context, task)
+            log.write("tool", node="search", output=out,
+                      summary=f"{out.count('[S')} pages")
+            return f"\n\n{out}"
+        if name == "@link":
+            # Runs only after ranking, so ranking never sees affiliate status.
+            ranked = next(r["output"] for r in reversed(results)
+                          if r["node"] == self.cfg.get("link_from", "Ranker"))
+            path = self.root / "affiliates.json"
+            programs = json.loads(path.read_text()) if path.exists() else {}
+            linked, missing = tools.link_offers(
+                ranked, programs, self.root / "join_queue.md")
+            self._linked = linked
+            log.write("tool", node="link", output=linked, missing=missing,
+                      summary=f"no program: {missing}" if missing else "all linked")
+            return ("\n\n### LINKED OFFERS (use these links exactly)\n" + linked)
+        raise ValueError(f"unknown tool node {name}")
+
     # ---- whole graph --------------------------------------------------
     def run(self, task, approve=None):
         log = RunLog(self.root, self.name)
         self._sources = None
+        self._linked = None
         if any("fetch_urls" in a.tools for a in self.agents.values()):
             self._sources = tools.fetch_urls(task)
             log.write("tool", node="fetch_urls", output=self._sources,
@@ -146,6 +168,9 @@ class Team:
                   summary=f"{rule}: {stages}")
         context, results = "", []
         for stage in stages:
+            if isinstance(stage, str) and stage.startswith("@"):
+                context += self.run_tool(stage, task, context, results, log)
+                continue
             # fan-out: independent agents in a stage run in parallel
             with ThreadPoolExecutor(max_workers=len(stage)) as ex:
                 outs = list(ex.map(
@@ -163,6 +188,16 @@ class Team:
         want = self.cfg.get("final_from")
         picked = [r for r in results if not want or r["node"] in want] or results
         final = "\n\n".join(r["output"] for r in picked[-len(want or [1]):])
+        if self._linked is not None:
+            allowed = set(tools.URL_RE.findall(self._linked))
+            bad = [u for u in tools.URL_RE.findall(final) if u not in allowed]
+            if bad:
+                flagged.append({"node": "LinkGuard", "still_wrong":
+                                [f"link not from LINKED OFFERS: {u}" for u in bad]})
+                log.write("check", node="LinkGuard", round=0, score="0/1",
+                          ok=False, fixes=bad, summary=f"{len(bad)} bad links")
+        if self.cfg.get("disclosure"):
+            final += "\n\n" + self.cfg["disclosure"]
         log.write("final", node="Lead", flagged=[f["node"] for f in flagged],
                   summary="ready for approval")
 
@@ -194,10 +229,13 @@ def _ask_human(final, flagged):
         print(f"\n!! {f['node']} still failing after {MAX_FIX_ROUNDS} rounds:")
         for s in f.get("still_wrong", []):
             print(f"   - {s}")
-    return input("\nApprove and release? [y/N] ").strip().lower() == "y"
+    try:
+        return input("\nApprove and release? [y/N] ").strip().lower() == "y"
+    except EOFError:
+        return False
 
 
-def load_team(name="deal_researcher", root="."):
+def load_team(name="deal_finder", root="."):
     root = Path(root)
     cfg = json.loads((root / "teams" / f"{name}.json").read_text())
     return Team(root, name, cfg)

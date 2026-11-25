@@ -1,29 +1,43 @@
 # Agentteam
 
-A small team of AI agents that runs on your own local LLM through any
-OpenAI-compatible endpoint. The first team is a **Deal researcher**: give it a
-deal (links or local files) and it returns BUY, NEGOTIATE or WALK with the true
-total cost and the top risk. A **Dev company** team is drafted for v2.
+A team of AI agents that runs on your own local LLM through any
+OpenAI-compatible endpoint (Strata, llama.cpp, vLLM, LM Studio).
+
+**First team: Deal finder.** A consumer asks for a product. The team searches,
+verifies real offers and total cost, checks seller risk, ranks on value only,
+and **then** attaches your affiliate link where you have one. Merchants with
+no program are shown anyway with a plain link and added to `join_queue.md` so
+you can decide whether to join. A disclosure line is always appended by code.
 
 Plain Python 3.10+, standard library only. Nothing to install.
 
 ## Run in 3 steps
 
-1. Point it at your model (key only if your server needs one):
+1. Point it at your model and a search source:
    ```bash
    export AGENTTEAM_BASE_URL=http://100.97.220.76:8094/v1
    export AGENTTEAM_MODEL=qwen3.8-flash-next-q2_0
-   # export AGENTTEAM_API_KEY=...
+   # export AGENTTEAM_API_KEY=...            # only if your server needs one
+   # Search: an MCP search server (e.g. the searx one Strata uses) ...
+   export AGENTTEAM_SEARCH_MCP_URL=http://HOST:PORT/mcp
+   # ... or a SearXNG instance with JSON output enabled:
+   # export AGENTTEAM_SEARX_URL=http://HOST:PORT
    ```
-2. Check the model can do the job: `python -m agentteam smoke`
-3. Run the team:
-   ```bash
-   python -m agentteam run "Is this a good deal? https://example.com/offer"
-   ```
+   `python -m agentteam mcp-tools $AGENTTEAM_SEARCH_MCP_URL` lists its tools.
+2. Check the model: `python -m agentteam smoke`
+3. Run: `python -m agentteam run "best laptop stand under $60"`
 
-You see every agent's output and score live, then approve or hold the final
-answer. Each run is logged to `runs/<team>/*.jsonl`; team memory lives in
-`memory/<team>.md` and is read before every run.
+Affiliate programs go in `affiliates.json` (copy `affiliates.example.json`).
+It is git-ignored.
+
+You see every agent's output and Checker score live, then approve or hold the
+reply. Runs are logged to `runs/<team>/`, memory to `memory/<team>.md`.
+
+## Integrity rules enforced in code
+
+- The Ranker never sees affiliate data; links are added after ranking.
+- A link guard flags any link in the reply that the linker did not produce.
+- The disclosure is appended by code, not left to the model.
 
 ## Weekly improvement
 
@@ -32,4 +46,5 @@ python -m agentteam improve            # Lead proposes ONE prompt change
 python -m agentteam improve --apply    # only after you agree
 ```
 
-See [TEAMS.md](TEAMS.md) for the agents, their prompts and the graph.
+Other teams: `--team deal_researcher` (vet one deal from links),
+`--team dev_company` (draft). See [TEAMS.md](TEAMS.md).

@@ -2,13 +2,45 @@
 
 Agent definitions live in `teams/*.json`. Each agent has JOB, INPUT, OUTPUT,
 DONE WELL (3 to 5 checks), NEVER and ASK ME FIRST, which the runner turns into
-its prompt. You talk only to the Lead (the runner's routing rules plus the
-final approval step).
+its prompt. Stages starting with `@` are code steps, not LLM calls.
 
-## Deal researcher (v1, first job)
+## Deal finder (first job)
 
-Why first: it's read-only, the output is short and checkable, and it suits a
-small local model better than writing code.
+| Node | Job | Hands to |
+|---|---|---|
+| Intake | Request to brief: product, budget, country, must-haves, QUERY lines | search |
+| @search | Code: run queries via MCP/SearXNG, read top pages | Verifier, Risk |
+| Verifier | Real offers with exact URL, total cost, stock, returns | Ranker |
+| Risk | Seller and offer risk, quoted from sources | Ranker |
+| Ranker | Top 3 on value only, GOOD DEAL yes/no; never sees affiliate data | @link |
+| @link | Code: add affiliate links you have, queue merchants without one | Writer |
+| Writer | Consumer reply, links copied exactly | your approval |
+| Checker | Scores each agent against DONE WELL, max 2 fix rounds | back to agent |
+
+```mermaid
+flowchart LR
+  Consumer -->|product request| Intake
+  Intake -->|queries| Search
+  Search -->|sources| Verifier
+  Search -->|sources| Risk
+  Verifier -->|offers| Ranker
+  Risk -->|risk ratings| Ranker
+  Ranker -->|top 3 no affiliate data| Link
+  Link -->|missing programs| JoinQueue
+  Link -->|linked offers| Writer
+  Writer -->|reply| LinkGuard
+  LinkGuard -->|reply plus disclosure| Approve
+  Approve -->|yes| Consumer
+  Checker -.->|fixes max 2| Verifier
+  Checker -.->|fixes max 2| Ranker
+  Checker -.->|fixes max 2| Writer
+```
+
+Paste this code at mermaid.live to see the picture.
+
+Plain version: Consumer -> Intake -> search -> (Verifier || Risk) -> Ranker -> link -> Writer -> link guard -> disclosure -> your approval -> Consumer. Every agent's output goes through the Checker first.
+
+## Deal researcher (vet one deal you already have)
 
 | Agent | Job | Hands to |
 |---|---|---|

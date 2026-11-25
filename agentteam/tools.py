@@ -86,6 +86,17 @@ def fetch_page(url, timeout=20):
     return parse_html(raw, url)
 
 
+TRACKING = re.compile(r"^(cmp|utm_\w+|ref|ref_|tag|gclid|fbclid|icid|intcmp|irclickid|clickid|cm_\w+|spm|scm)$", re.I)
+
+
+def clean_url(u):
+    """Drop tracking parameters so agents copy short, stable links."""
+    parts = urllib.parse.urlsplit(u)
+    q = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+         if not TRACKING.match(k)]
+    return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(q)))
+
+
 def parse_html(raw, url):
     """(text, product_links) from raw HTML; url resolves relative links."""
     raw = re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", raw)
@@ -95,7 +106,7 @@ def parse_html(raw, url):
         m = re.search(r'href=["\']([^"\']+)["\']', html.unescape(attrs))
         if not m or m.group(1).startswith("#"):
             continue
-        full = urllib.parse.urljoin(url, m.group(1).split("#")[0])
+        full = clean_url(urllib.parse.urljoin(url, m.group(1).split("#")[0]))
         if not PRODUCT_HREF.search(full) or SKIP_HREF.search(full):
             continue
         label = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", inner))).strip()
@@ -261,7 +272,9 @@ def search_sources(context, task, per_query=4, max_pages=5):
     for name in [x.strip() for x in os.environ.get("AGENTTEAM_STORES", "").split(",") if x.strip()]:
         i = len(blocks) + 1
         try:
-            page_url, raw = stores.search(name, queries[0].strip())
+            product = re.search(r"(?im)^\W*PRODUCT:\s*(.+)$", context)
+            q = product.group(1).strip() if product else queries[0].strip()
+            page_url, raw = stores.search(name, q[:60])
             text, links = parse_html(raw, page_url)
             body = price_focus(text)
             LAST_LINKS[i] = links

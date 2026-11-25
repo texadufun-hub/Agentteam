@@ -115,10 +115,10 @@ class Team:
                 f"\n\nCONTEXT:\n{context}")
         work = llm.chat(agent.prompt(), user, model=agent.model)
         log.write("node", node=name, round=0, output=work, summary=work[:80])
-        allowed = set(tools.URL_RE.findall(user))
+        allowed = {u.lower() for u in tools.URL_RE.findall(user)}
         for rnd in range(MAX_FIX_ROUNDS + 1):
             # URL guard (code, not model): every link must come from the input.
-            invented = [u for u in tools.URL_RE.findall(work) if u not in allowed]
+            invented = [u for u in tools.URL_RE.findall(work) if u.lower() not in allowed]
             if invented:
                 ok, score, detail = False, "0/1 links", []
                 fixes = [f"Remove this link, it is not in your input; use only links copied from your input, or write NO LINK: {u}"

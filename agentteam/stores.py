@@ -19,9 +19,16 @@ CACHE = Path(os.environ.get("AGENTTEAM_UFETCH_CACHE",
                             "~/.cache/universal_fetch")).expanduser()
 
 
-def _ufetch_search(site, query):
+def _ufetch_search(site, query, page_only=False, **extra):
     path = CACHE / f"last_{site}.html"
-    out = MCP(UFETCH, timeout=300).call("fetch_search", {"site": site, "query": query})
+    start = time.time()
+    out = MCP(UFETCH, timeout=300).call("fetch_search", {"site": site, "query": query, **extra})
+    if page_only:
+        # Caller wants the page itself (e.g. its embedded JSON), and only one
+        # saved during this call, so it can't be another query's page.
+        if not path.exists() or path.stat().st_mtime < start - 1:
+            raise RuntimeError(f"ufetch saved no fresh page for {site}")
+        return path.read_text(errors="replace")
     listed = _listings_as_html(out)
     # ufetch parsed listings itself (it then saves no page copy). Use them if
     # they carry prices; otherwise a fresh saved page, if any, is better.
@@ -73,7 +80,7 @@ def costco(query):
     return url, _ufetch_search("costco_ca", query)
 
 
-def _walk_products(node, base, out):
+def _walk_products(node, base, out, local=False):
     """Find product-like dicts (a name, a price, a URL or id) anywhere in a
     page's embedded JSON."""
     if isinstance(node, dict):
@@ -91,10 +98,11 @@ def _walk_products(node, base, out):
             # Notes go first: link labels are cut at ~90 characters, and a
             # long product name would otherwise push them off the end.
             notes = []
-            # Walmart's plain page answers for its default location
-            # (Mississauga), not the consumer's, so this is not "can't ship".
+            # Only trust "can't ship" when the page was for the consumer's
+            # own postal code; otherwise it's Walmart's default location.
             if "shipToHome_not_available" in str(node.get("fulfillmentTitle", "")):
-                notes.append("(shipping to your area unknown)")
+                notes.append("(ship to home: not available)" if local
+                             else "(shipping to your area unknown)")
             if node.get("sellerType") == "EXTERNAL" or node.get("fulfillmentType") == "MARKETPLACE":
                 notes.append("(marketplace third-party seller)")
             if "classType=VARIANT" in url:
@@ -103,10 +111,10 @@ def _walk_products(node, base, out):
             label = " ".join(notes + [f"{p if '$' in p else '$' + p}{by}", name])
             out.append((label, urllib.parse.urljoin(base, url)))
         for v in node.values():
-            _walk_products(v, base, out)
+            _walk_products(v, base, out, local)
     elif isinstance(node, list):
         for v in node:
-            _walk_products(v, base, out)
+            _walk_products(v, base, out, local)
 
 
 def _plain_with_json(url, product_path):
@@ -128,11 +136,29 @@ def _plain_with_json(url, product_path):
                 raise
             wait = e.headers.get("Retry-After", "")
             time.sleep(min(int(wait) if wait.isdigit() else 30, 60))
+    return _json_rows(raw, url, product_path)
+
+
+def _page_postal(data):
+    """The postal code a Walmart page was built for (pageMetadata.location)."""
+    try:
+        return data["props"]["pageProps"]["initialData"]["pageMetadata"]["location"]["postalCode"] or ""
+    except (KeyError, TypeError):
+        return ""
+
+
+def _json_rows(raw, url, product_path):
+    """Listings from a page's embedded __NEXT_DATA__ JSON, as anchors our
+    extractor reads; the raw page if there are none."""
+    import html, json, re
     items = []
     m = re.search(r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', raw, re.S)
     if m:
         try:
-            _walk_products(json.loads(m.group(1)), url, items)
+            data = json.loads(m.group(1))
+            mine = os.environ.get("AGENTTEAM_POSTAL", "").replace(" ", "").upper()[:3]
+            local = bool(mine) and _page_postal(data).replace(" ", "").upper().startswith(mine)
+            _walk_products(data, url, items, local)
         except ValueError:
             pass
     seen, rows = set(), []
@@ -158,8 +184,16 @@ def _cached(name, query, fetch):
 
 
 def walmart(query):
+    """Through ufetch's saved browser session first (it holds the shopper's
+    postal code); plain HTTP, at Walmart's default location, if that fails."""
     url = "https://www.walmart.ca/en/search?" + urllib.parse.urlencode({"q": query})
-    return url, _cached("walmart", query, lambda: _plain_with_json(url, "/ip/"))
+    def fetch():
+        try:
+            raw = _ufetch_search("walmart_ca", query, page_only=True, use_session=True)
+            return _json_rows(raw, url, "/ip/")
+        except Exception:
+            return _plain_with_json(url, "/ip/")
+    return url, _cached("walmart", query, fetch)
 
 
 READERS = {"newegg": newegg, "staples": staples, "walmart": walmart, "costco": costco}

@@ -318,7 +318,26 @@ _SHIP = re.compile(r"\bshipping\s*:?\s*(free|unknown|(?:CAD\s*)?\$\s*[\d,]+(?:\.
 NO_SHIP = re.compile(r"DELIVERY UNAVAILABLE|ship to home: not available", re.I)
 
 
-def price_order(offers_text, tie=5.0, blocked=()):
+def price_seen(price, line, url, evidence, labels=None, before=160, after=15):
+    """True if the sources show this price next to this product: in its own
+    link label, or in the text just before the price (names come before
+    prices on listing pages) holding its URL or two of its name words."""
+    want = f"{price:.2f}".rstrip("0").rstrip(".")
+    pat = re.compile(r"\$\s*" + re.escape(want).replace(r"\.", r"\.") + r"(?:0*)?(?!\d)")
+    for label in labels or []:
+        if pat.search(label):
+            return True
+    name = (_tokens(line.replace(url, "")) - GENERIC)
+    name = {w for w in name if len(w) >= 4 and not re.fullmatch(r"[\d.,]+", w)
+            and w not in {"price", "shipping", "unknown", "free", "total", "cost", "variant", "stock", "returns"}}
+    for m in pat.finditer(evidence):
+        win = evidence[max(0, m.start() - before): m.end() + after]
+        if url in win or len(name & _tokens(win)) >= 2:
+            return True
+    return False
+
+
+def price_order(offers_text, tie=5.0, blocked=(), evidence=None, labels_by_url=None, dropped=None):
     """Sort offer lines cheapest first: total cost when shipping is known,
     item price when it is not. Within `tie` dollars, confirmed shipping goes
     first. Lines without a price, or that can't be shipped (marked in the
@@ -331,6 +350,11 @@ def price_order(offers_text, tie=5.0, blocked=()):
         if not urls or not m or NO_SHIP.search(line) or urls[0].lower() in blocked:
             continue
         price = float(m.group(1).replace(",", ""))
+        if evidence is not None and not price_seen(
+                price, line, urls[0], evidence, (labels_by_url or {}).get(urls[0].lower())):
+            if dropped is not None:
+                dropped.append(line.strip())
+            continue
         sh = _SHIP.search(line)
         ship = sh.group(1).lower() if sh else "unknown"
         if ship == "free":

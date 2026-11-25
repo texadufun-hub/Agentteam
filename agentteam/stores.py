@@ -77,7 +77,26 @@ def staples(query):
 
 def costco(query):
     url = "https://www.costco.ca/s?" + urllib.parse.urlencode({"keyword": query})
-    return url, _ufetch_search("costco_ca", query)
+    return url, _costco_tiles(_ufetch_search("costco_ca", query), url)
+
+
+def _costco_tiles(raw, base):
+    """Pair each Costco product tile's title, price and link by the product
+    id in their data-testid / id attributes, so a price can't drift onto
+    another product when page text is trimmed."""
+    import html, re
+    strip = lambda t: re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", t))).strip()
+    prices = {i: strip(p) for i, p in re.findall(r'data-testid="Text_Price_(\d+)"[^>]*>(.*?)</', raw, re.S)}
+    titles = {i: strip(t) for i, t in re.findall(r'id="ProductTile_(\d+)_title"[^>]*>(.*?)</h3>', raw, re.S)}
+    links = {}
+    for href in re.findall(r'href="([^"]*/p/-/[^"]*)"', raw):
+        m = re.search(r"/(\d{6,})(?:[/?#]|$)", href)
+        if m:
+            links.setdefault(m.group(1), urllib.parse.urljoin(base, html.unescape(href)))
+    rows = [f'<a href="{html.escape(links[i])}">{html.escape(titles[i])} {html.escape(prices.get(i, "price not shown"))}</a> '
+            f'{html.escape(titles[i])} {html.escape(prices.get(i, "price not shown"))}'
+            for i in titles if i in links]
+    return "\n".join(rows) if rows else raw
 
 
 def _walk_products(node, base, out, local=False):

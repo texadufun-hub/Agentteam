@@ -206,7 +206,18 @@ class Team:
             # even if the Verifier didn't copy that note.
             blocked = {u.lower() for ls in self._links.values() for label, u in ls
                        if tools.NO_SHIP.search(label)}
-            rows = tools.price_order(offers, blocked=blocked)
+            # Price guard: an offer whose price isn't shown next to that
+            # product in the sources is dropped, not ranked.
+            labels = {}
+            for ls in self._links.values():
+                for label, u in ls:
+                    labels.setdefault(u.lower(), []).append(label)
+            dropped = []
+            rows = tools.price_order(offers, blocked=blocked, evidence=self._search or "",
+                                     labels_by_url=labels, dropped=dropped)
+            if dropped:
+                log.write("check", node="PriceGuard", round=0, score=f"{len(dropped)} dropped",
+                          ok=False, fixes=dropped, summary=f"{len(dropped)} prices not in sources")
             self._order = [r[2] for r in rows]
             lines = [f"{i}. ${b:.2f} {'confirmed total' if c else 'item price, shipping unknown'} | {ln}"
                      for i, (b, c, u, ln) in enumerate(rows, 1)]

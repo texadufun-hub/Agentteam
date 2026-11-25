@@ -28,7 +28,7 @@ Plain Python 3.10+, standard library only. Nothing to install.
    `python -m agentteam mcp-tools $AGENTTEAM_SEARCH_MCP_URL` lists its tools.
 
    Extra stores read through ufetch's headless browser:
-   `export AGENTTEAM_STORES=newegg,staples,walmart,costco` (staples/costco need their ufetch profiles; walmart uses the walmart_ca profile with a saved session, else plain HTTP; set AGENTTEAM_POSTAL to your postal prefix) (see `agentteam/stores.py`).
+   `export AGENTTEAM_STORES=newegg,staples,walmart,costco` (staples/costco need their ufetch profiles; walmart reads the plain page at its default location, so its shipping shows as unknown) (see `agentteam/stores.py`).
 2. Check the model: `python -m agentteam smoke`
 3. Run: `python -m agentteam run "best laptop stand under $60"`
 

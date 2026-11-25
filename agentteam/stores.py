@@ -184,16 +184,11 @@ def _cached(name, query, fetch):
 
 
 def walmart(query):
-    """Through ufetch's saved browser session first (it holds the shopper's
-    postal code); plain HTTP, at Walmart's default location, if that fails."""
+    """Plain HTTP search page, at Walmart's default location (it keeps the
+    shopper's location in a server-side session), so its "can't ship" notes
+    become "shipping to your area unknown" unless AGENTTEAM_POSTAL matches."""
     url = "https://www.walmart.ca/en/search?" + urllib.parse.urlencode({"q": query})
-    def fetch():
-        try:
-            raw = _ufetch_search("walmart_ca", query, page_only=True, use_session=True)
-            return _json_rows(raw, url, "/ip/")
-        except Exception:
-            return _plain_with_json(url, "/ip/")
-    return url, _cached("walmart", query, fetch)
+    return url, _cached("walmart", query, lambda: _plain_with_json(url, "/ip/"))
 
 
 READERS = {"newegg": newegg, "staples": staples, "walmart": walmart, "costco": costco}

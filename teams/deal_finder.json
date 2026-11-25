@@ -85,7 +85,8 @@
       "hands_to": "Ranker",
       "tools": [
         "sources"
-      ]
+      ],
+      "think": false
     },
     {
       "name": "Ranker",
@@ -103,7 +104,8 @@
         "Invent offers not in Verifier's list",
         "Rank #1 an offer marked DELIVERY UNAVAILABLE"
       ],
-      "hands_to": "link"
+      "hands_to": "link",
+      "think": false
     },
     {
       "name": "Writer",
@@ -121,7 +123,8 @@
         "Hide a risk Ranker listed for the #1 pick",
         "Write the disclosure (the system adds it)"
       ],
-      "hands_to": "You"
+      "hands_to": "You",
+      "think": false
     }
   ],
   "resolve_product_links": [
